@@ -4,7 +4,7 @@
 *********************** H E A D E R S  ***********************************
 *************************************************************************/
 
-#define MAX_LEN 14 
+#define MAX_LEN 3 
 // Mean packet size of standard ipv4 packet 420bytes? from caida
 
 header ethernet_t {
@@ -107,7 +107,10 @@ parser MyParser(packet_in packet,
                 inout standard_metadata_t standard_metadata) {
     
     state start {
+        meta.parser_metadata.enable_tre = 1;
+        meta.parser_metadata.remaining = MAX_LEN;
         transition parse_ethernet;
+       
     }
     state parse_ethernet {
         packet.extract(hdr.ethernet);
@@ -208,6 +211,7 @@ control MyIngress(inout headers hdr,
         mark_to_drop();
     }
 
+    
     action set_egress(bit<9> port) {
         standard_metadata.egress_spec = port;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
@@ -218,10 +222,12 @@ control MyIngress(inout headers hdr,
             hdr.ipv4.dstAddr: lpm;
         }
         actions = {
-            drop;
+            NoAction();
             set_egress;
+            drop;
         }
         size = 2048;
+        default_action = NoAction();
     }
 
     apply {
@@ -230,7 +236,7 @@ control MyIngress(inout headers hdr,
         ipv4_forwarding.apply();
 
         }else{
-        drop();
+        NoAction();
         } 
     }
 }
@@ -271,7 +277,7 @@ action fingerprinting() {
 }
 // Chunk[N + M], N=0, M=1 
 action store_fingerprint() {
-
+meta.custom_metadata.value = hdr.chunk[1].payload;
 fingerprint_store.write( meta.custom_metadata.fingerprint, meta.custom_metadata.value);
 /*fingerprint_store.write( meta.fingerprint[1], hdr.chunk[4]);
 fingerprint_store.write( meta.fingerprint[2], hdr.chunk[7]);
@@ -279,18 +285,18 @@ fingerprint_store.write( meta.fingerprint[3], hdr.chunk[10]);
 fingerprint_store.write( meta.fingerprint[4], hdr.chunk[13]);*/
 }
 
-/*
-action store_lvalue() {
 
-//left_store.write( meta.fingerprint[0], hdr.chunk[0]);
-left_store.write( meta.fingerprint[1], hdr.chunk[3]);
+action store_lvalue() {
+meta.custom_metadata.left_value = hdr.chunk[0].payload;
+left_store.write( meta.custom_metadata.fingerprint, meta.custom_metadata.left_value);
+/*left_store.write( meta.fingerprint[1], hdr.chunk[3]);
 left_store.write( meta.fingerprint[2], hdr.chunk[6]);
 left_store.write( meta.fingerprint[3], hdr.chunk[9]);
-left_store.write( meta.fingerprint[4], hdr.chunk[12]); 
-}*/
+left_store.write( meta.fingerprint[4], hdr.chunk[12]); */
+}
 
 action store_rvalue() {
-
+meta.custom_metadata.right_value = hdr.chunk[2].payload;
 right_store.write( meta.custom_metadata.fingerprint, meta.custom_metadata.right_value);
 /*right_store.write( meta.fingerprint[1], hdr.chunk[5]);
 right_store.write( meta.fingerprint[2], hdr.chunk[8]);
@@ -300,7 +306,6 @@ right_store.write( meta.fingerprint[4], hdr.chunk[14]);*/
 
 
 action st_retrieval() {
-
 fingerprint_store.read(tmp_finger_value, meta.custom_metadata.fingerprint);
 /*fignerprint_store.read(tmp_finger_value[1], meta.fingerprint[1]);
 fignerprint_store.read(tmp_finger_value[2], meta.fingerprint[2]);
@@ -310,7 +315,6 @@ fignerprint_store.read(tmp_finger_value[4], meta.fingerprint[4]);*/
 
 
 action lst_retrieval() {
-
 left_store.read(tmp_left_value, meta.custom_metadata.fingerprint);
 /*left_store.read(tmp_left_value[1], meta.fingerprint[1]);
 left_store.read(tmp_left_value[2], meta.fingerprint[2]);
@@ -319,124 +323,61 @@ left_store.read(tmp_left_value[4], meta.fingerprint[4]);*/
 }
 
 action rst_retrieval() {
-
-right_store.read(tmp_left_value, meta.custom_metadata.fingerprint);
+right_store.read(tmp_right_value, meta.custom_metadata.fingerprint);
 /*left_store.read(tmp_left_value[1], meta.fingerprint[1]);
 left_store.read(tmp_left_value[2], meta.fingerprint[2]);
 left_store.read(tmp_left_value[3], meta.fingerprint[3]);
 left_store.read(tmp_left_value[4], meta.fingerprint[4]);*/
 }
 
-action tokenization() {
+action tokenization0() {
+
+hdr.chunk[0].setInvalid();
+hdr.token[0].setValid();
+hdr.token[0].bitmap1 = 1;
+hdr.token[0].index = meta.custom_metadata.fingerprint;
+
+}
+action tokenization1() {
 
 hdr.chunk[1].setInvalid();
 hdr.token[1].setValid();
-hdr.token[1].bitmap1 = 0;
-hdr.token[1].bitmap2 = 1;
-hdr.token[1].bitmap3 = 0;
+hdr.token[1].bitmap2 = 0;
 hdr.token[1].index = meta.custom_metadata.fingerprint;
 
 }
+action tokenization2() {
 
+hdr.chunk[2].setInvalid();
+hdr.token[2].setValid();
+hdr.token[2].bitmap3 = 0;
+hdr.token[2].index = meta.custom_metadata.fingerprint;
+
+}
 apply{
 
     
     fingerprinting();
-
+    store_fingerprint();
+    store_lvalue();
+    store_rvalue();
     st_retrieval(); 
-    if( tmp_finger_value == hdr.chunk[1].payload) {
+
+    if( tmp_finger_value == meta.custom_metadata.value) {
         //lst_retrieval('0');
-        rst_retrieval();           
-        tokenization();
-        if ( tmp_right_value == hdr.chunk[2].payload ){
-        tokenization();
+        tokenization1();
+        rst_retrieval();
+        lst_retrieval();           
+        if ( tmp_left_value == meta.custom_metadata.left_value){
+        tokenization0();}
+        if ( tmp_right_value == meta.custom_metadata.right_value){
+        tokenization2();}
             
             
             
         }
-    }else{
-
-        store_fingerprint();
-      //  store_lvalue();
-        store_rvalue();
-    
-
-    }
-/*
-    if( tmp_finger_value[4] == hdr.chunk[4]) {
-        
-        action1
-        action2 
-        action3
-
-        if ( tmp_left_value[3] == hdr.chunk[3]){
-
-
-        }
-        if ( tmp_rigt_value[5] == hdr.chunk[5] ){
-        
-            action1
-            action2
-        }
-
     }
 
-    if( tmp_finger_value[7] == hdr.chunk[7]) {
-        
-        action1
-        action2 
-        action3
-
-        if ( tmp_left_value[6] == hdr.chunk[6]){
-
-
-        }
-        if ( tmp_rigt_value[8] == hdr.chunk[8] ){
-        
-            action1
-            action2
-        }
-
-    }
-
-    if( tmp_finger_value[10] == hdr.chunk[10]) {
-        
-        action1
-        action2 
-        action3
-
-        if ( tmp_left_value[9] == hdr.chunk[9]){
-
-
-        }
-        if ( tmp_rigt_value[11] == hdr.chunk[11] ){
-        
-            action1
-            action2
-        }
-
-    }
-
-    if( tmp_finger_value[13] == hdr.chunk[13]) {
-        
-        action1
-        action2 
-        action3
-
-        if ( tmp_left_value[12] == hdr.chunk[12]){
-
-
-        }
-        if ( tmp_rigt_value[14] == hdr.chunk[14] ){
-        
-            action1
-            action2
-        }
-
-    }*/
-
-
-}
    
  
 }
@@ -458,7 +399,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.token[1]);
         packet.emit(hdr.chunk[2]);
         packet.emit(hdr.token[2]);
-        packet.emit(hdr.chunk[3]);
+    /*  packet.emit(hdr.chunk[3]);
         packet.emit(hdr.token[3]);
         packet.emit(hdr.chunk[4]);
         packet.emit(hdr.token[4]);
@@ -479,7 +420,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.chunk[12]);
         packet.emit(hdr.token[12]);
         packet.emit(hdr.chunk[13]);
-        packet.emit(hdr.token[13]);
+        packet.emit(hdr.token[13]);*/
         
 
     }
