@@ -119,9 +119,6 @@ struct metadata {
 
 }
 
-
-
-
 /*************************************************************************
 *********************** P A R S E R  ***********************************
 *************************************************************************/
@@ -225,8 +222,6 @@ parser MyParser(packet_in packet,
 
 }
 
-
-
 /*************************************************************************
 *************   C H E C K S U M    C O M P U T A T I O N   **************
 *************************************************************************/
@@ -251,8 +246,6 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
     }
 }
 
-
-
 /*************************************************************************
 ************   C H E C K S U M    V E R I F I C A T I O N   *************
 *************************************************************************/
@@ -269,11 +262,9 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
     
-
     action drop() {
         mark_to_drop(standard_metadata);
     }
-
     
     action set_egress() {
         standard_metadata.egress_spec = 2;
@@ -293,7 +284,113 @@ control MyIngress(inout headers hdr,
         default_action = set_egress;
     }
 
+    #define FLOW_REGISTER_SIZE 65536
+    #define FLOW_HASH_BASE_0 16w0
+    #define FLOW_HASH_MAX_0 16w16383
+    #define FLOW_HASH_BASE_1 16w16384
+    #define FLOW_HASH_MAX_1 16w32767
+    #define FLOW_HASH_BASE_2 16w32768
+    #define FLOW_HASH_MAX_2 16w49151
+    #define FLOW_HASH_BASE_3 16w49152
+    #define FLOW_HASH_MAX_3 16w65535
+    #define THRESHOLD 128
+
+    register<bit<10>>(FLOW_REGISTER_SIZE) hot_flow_counter;
+    register<bit<1>>(FLOW_REGISTER_SIZE) bloom_filter;
+
     apply {
+
+        /* find hot flow */
+        bit<16> register_idx;
+        bit<10> tmp = 0;
+        bit<10> min_count = 0;
+
+        // count per flow
+        if (hdr.ipv4.protocol == IPV4_PROTOCOL_TCP) {
+            hash(register_idx, HashAlgorithm.crc32, FLOW_HASH_BASE_0, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, 
+                FLOW_HASH_MAX_0);
+            hot_flow_counter.read(tmp, (bit<32>)register_idx);
+            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+            min_count = tmp + 1;
+
+            hash(register_idx, HashAlgorithm.crc16, FLOW_HASH_BASE_1, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, 
+                FLOW_HASH_MAX_1);
+            hot_flow_counter.read(tmp, (bit<32>)register_idx);
+            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+            if (min_count > tmp + 1) { min_count = tmp + 1; }
+
+            hash(register_idx, HashAlgorithm.csum16, FLOW_HASH_BASE_2, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, 
+                FLOW_HASH_MAX_2);
+            hot_flow_counter.read(tmp, (bit<32>)register_idx);
+            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+            if (min_count > tmp + 1) { min_count = tmp + 1; }
+
+            hash(register_idx, HashAlgorithm.identity, FLOW_HASH_BASE_3, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, 
+                FLOW_HASH_MAX_3);
+            hot_flow_counter.read(tmp, (bit<32>)register_idx);
+            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+            if (min_count > tmp + 1) { min_count = tmp + 1; }
+        } else {
+            hash(register_idx, HashAlgorithm.crc32, FLOW_HASH_BASE_0, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort }, 
+                FLOW_HASH_MAX_0);
+            hot_flow_counter.read(tmp, (bit<32>)register_idx);
+            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+            min_count = tmp + 1;
+
+            hash(register_idx, HashAlgorithm.crc16, FLOW_HASH_BASE_1, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort }, 
+                FLOW_HASH_MAX_1);
+            hot_flow_counter.read(tmp, (bit<32>)register_idx);
+            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+            if (min_count > tmp + 1) { min_count = tmp + 1; }
+
+            hash(register_idx, HashAlgorithm.csum16, FLOW_HASH_BASE_2, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort }, 
+                FLOW_HASH_MAX_2);
+            hot_flow_counter.read(tmp, (bit<32>)register_idx);
+            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+            if (min_count > tmp + 1) { min_count = tmp + 1; }
+
+            hash(register_idx, HashAlgorithm.identity, FLOW_HASH_BASE_3, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort }, 
+                FLOW_HASH_MAX_3);
+            hot_flow_counter.read(tmp, (bit<32>)register_idx);
+            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+            if (min_count > tmp + 1) { min_count = tmp + 1; }
+        }
+
+        if (min_count >= THRESHOLD) {
+            // apply bloom filter
+            bit<1> bf0; bit<1> bf1; bit<1> bf2;
+            bit<16> bf0_idx; bit<16> bf1_idx; bit<16> bf2_idx;
+            hash(bf0_idx, HashAlgorithm.crc32, FLOW_HASH_BASE_0, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort },
+                FLOW_HASH_MAX_3);
+            bloom_filter.read(bf0, (bit<32>)bf0_idx);
+            hash(bf1_idx, HashAlgorithm.crc16, FLOW_HASH_BASE_0, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort },
+                FLOW_HASH_MAX_3);
+            bloom_filter.read(bf1, (bit<32>)bf1_idx);
+            hash(bf2_idx, HashAlgorithm.csum16, FLOW_HASH_BASE_0, 
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort },
+                FLOW_HASH_MAX_3);
+            bloom_filter.read(bf2, (bit<32>)bf2_idx);
+
+            if (bf0 == 0 || bf2 == 0 || bf2 == 0) {
+                // TODO: report flow to controller
+
+                // -------------------------
+                bloom_filter.write((bit<32>)bf0_idx, 1);
+                bloom_filter.write((bit<32>)bf1_idx, 1);
+                bloom_filter.write((bit<32>)bf2_idx, 1);
+            }
+        }
+        
         if (hdr.ipv4.isValid() && hdr.ipv4.ttl > 0) {
             ipv4_forwarding.apply();
         }
