@@ -297,6 +297,9 @@ control MyIngress(inout headers hdr,
 
     register<bit<10>>(FLOW_REGISTER_SIZE) hot_flow_counter;
     register<bit<1>>(FLOW_REGISTER_SIZE) bloom_filter;
+    counter(1, CounterType.packets_and_bytes) report_counter;
+    register<bit<104>>(1) hot_flow_value;
+    bit<104> pkt_5_tuple = 0;
 
     apply {
 
@@ -383,7 +386,20 @@ control MyIngress(inout headers hdr,
 
             if (bf0 == 0 || bf2 == 0 || bf2 == 0) {
                 // TODO: report flow to controller
+                report_counter.count(0);
 
+                // extract 5-tuple from hdr & write register
+                pkt_5_tuple[31:0] = hdr.ipv4.srcAddr;
+                pkt_5_tuple[63:32] = hdr.ipv4.dstAddr;
+                pkt_5_tuple[71:64] = hdr.ipv4.protocol;
+                if (hdr.ipv4.protocol == IPV4_PROTOCOL_TCP) {
+                    pkt_5_tuple[87:72] = hdr.tcp.srcPort;
+                    pkt_5_tuple[103:88] = hdr.tcp.dstPort;
+                } else {
+                    pkt_5_tuple[87:72] = hdr.udp.srcPort;
+                    pkt_5_tuple[103:88] = hdr.udp.dstPort;
+                }
+                hot_flow_value.write(0, pkt_5_tuple);
                 // -------------------------
                 bloom_filter.write((bit<32>)bf0_idx, 1);
                 bloom_filter.write((bit<32>)bf1_idx, 1);
