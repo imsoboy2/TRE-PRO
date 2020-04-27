@@ -294,13 +294,14 @@ control MyIngress(inout headers hdr,
     #define FLOW_HASH_BASE_3 16w49152
     #define FLOW_HASH_MAX_3 16w65535
     #define THRESHOLD 128
+    #define CONTROLLER_PORT 10
 
     register<bit<10>>(FLOW_REGISTER_SIZE) hot_flow_counter;
     register<bit<1>>(FLOW_REGISTER_SIZE) bloom_filter;
 
     apply {
 
-        /* find hot flow */
+        /* ----------------------- find hot flow ----------------------- */
         bit<16> register_idx;
         bit<10> tmp = 0;
         bit<10> min_count = 0;
@@ -382,8 +383,8 @@ control MyIngress(inout headers hdr,
             bloom_filter.read(bf2, (bit<32>)bf2_idx);
 
             if (bf0 == 0 || bf2 == 0 || bf2 == 0) {
-                // TODO: report flow to controller
-
+                // report flow to controller
+                clone3(CloneType.I2E, CONTROLLER_PORT, { standard_metadata });
                 // -------------------------
                 bloom_filter.write((bit<32>)bf0_idx, 1);
                 bloom_filter.write((bit<32>)bf1_idx, 1);
