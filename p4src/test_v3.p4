@@ -9,6 +9,8 @@
 #define MAX_LEN 10 
 #define INGRESS 1
 #define EGRESS  0
+#define TRUE 1
+#define FALSE 0
 
 
 header ethernet_t {
@@ -89,6 +91,9 @@ struct headers {
 struct parser_metadata_t {
     bit<1> enable_tre;
     bit<4> remaining;
+
+    bit<16> srcPort;
+    bit<16> dstPort;
 }
 
 struct custom_metadata_t {
@@ -129,7 +134,7 @@ parser MyParser(packet_in packet,
                 inout standard_metadata_t standard_metadata) {
     
     state start { //default tre 
-        meta.parser_metadata.enable_tre = 1;
+        meta.parser_metadata.enable_tre = TRUE;
         meta.parser_metadata.remaining = MAX_LEN;
         transition parse_ethernet;
        
@@ -155,14 +160,18 @@ parser MyParser(packet_in packet,
     }
     
     state parse_tcp {
-        packet.extract(hdr.tcp);        
+        meta.parser_metadata.srcPort = hdr.tcp.srcPort; 
+        meta.parser_metadata.dstPort = hdr.tcp.dstPort;
+        packet.extract(hdr.tcp);       
         transition select(meta.parser_metadata.enable_tre) {
             1 : parse_tre_bitmap;
             0 : accept;
         }
     }
      state parse_udp {
-        packet.extract(hdr.udp);        
+        meta.parser_metadata.srcPort = hdr.udp.srcPort; 
+        meta.parser_metadata.dstPort = hdr.udp.dstPort;
+        packet.extract(hdr.udp);     
         transition select(meta.parser_metadata.enable_tre) {
             1 : parse_tre_bitmap;
             0 : accept;
@@ -307,63 +316,34 @@ control MyIngress(inout headers hdr,
         bit<10> min_count = 0;
 
         // count per flow
-        if (hdr.ipv4.protocol == IPV4_PROTOCOL_TCP) {
-            hash(register_idx, HashAlgorithm.crc32, FLOW_HASH_BASE_0, 
-                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, 
-                FLOW_HASH_MAX_0);
-            hot_flow_counter.read(tmp, (bit<32>)register_idx);
-            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
-            min_count = tmp + 1;
+        hash(register_idx, HashAlgorithm.crc32, FLOW_HASH_BASE_0, 
+            { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, meta.parser_metadata.srcPort, meta.parser_metadata.dstPort }, 
+            FLOW_HASH_MAX_0);
+        hot_flow_counter.read(tmp, (bit<32>)register_idx);
+        hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+        min_count = tmp + 1;
 
-            hash(register_idx, HashAlgorithm.crc16, FLOW_HASH_BASE_1, 
-                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, 
-                FLOW_HASH_MAX_1);
-            hot_flow_counter.read(tmp, (bit<32>)register_idx);
-            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
-            if (min_count > tmp + 1) { min_count = tmp + 1; }
+        hash(register_idx, HashAlgorithm.crc16, FLOW_HASH_BASE_1, 
+            { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, meta.parser_metadata.srcPort, meta.parser_metadata.dstPort }, 
+            FLOW_HASH_MAX_1);
+        hot_flow_counter.read(tmp, (bit<32>)register_idx);
+        hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+        if (min_count > tmp + 1) { min_count = tmp + 1; }
 
-            hash(register_idx, HashAlgorithm.csum16, FLOW_HASH_BASE_2, 
-                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, 
-                FLOW_HASH_MAX_2);
-            hot_flow_counter.read(tmp, (bit<32>)register_idx);
-            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
-            if (min_count > tmp + 1) { min_count = tmp + 1; }
+        hash(register_idx, HashAlgorithm.csum16, FLOW_HASH_BASE_2, 
+            { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, meta.parser_metadata.srcPort, meta.parser_metadata.dstPort }, 
+            FLOW_HASH_MAX_2);
+        hot_flow_counter.read(tmp, (bit<32>)register_idx);
+        hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+        if (min_count > tmp + 1) { min_count = tmp + 1; }
 
-            hash(register_idx, HashAlgorithm.identity, FLOW_HASH_BASE_3, 
-                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, 
-                FLOW_HASH_MAX_3);
-            hot_flow_counter.read(tmp, (bit<32>)register_idx);
-            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
-            if (min_count > tmp + 1) { min_count = tmp + 1; }
-        } else {
-            hash(register_idx, HashAlgorithm.crc32, FLOW_HASH_BASE_0, 
-                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort }, 
-                FLOW_HASH_MAX_0);
-            hot_flow_counter.read(tmp, (bit<32>)register_idx);
-            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
-            min_count = tmp + 1;
-
-            hash(register_idx, HashAlgorithm.crc16, FLOW_HASH_BASE_1, 
-                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort }, 
-                FLOW_HASH_MAX_1);
-            hot_flow_counter.read(tmp, (bit<32>)register_idx);
-            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
-            if (min_count > tmp + 1) { min_count = tmp + 1; }
-
-            hash(register_idx, HashAlgorithm.csum16, FLOW_HASH_BASE_2, 
-                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort }, 
-                FLOW_HASH_MAX_2);
-            hot_flow_counter.read(tmp, (bit<32>)register_idx);
-            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
-            if (min_count > tmp + 1) { min_count = tmp + 1; }
-
-            hash(register_idx, HashAlgorithm.identity, FLOW_HASH_BASE_3, 
-                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.udp.srcPort, hdr.udp.dstPort }, 
-                FLOW_HASH_MAX_3);
-            hot_flow_counter.read(tmp, (bit<32>)register_idx);
-            hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
-            if (min_count > tmp + 1) { min_count = tmp + 1; }
-        }
+        hash(register_idx, HashAlgorithm.identity, FLOW_HASH_BASE_3, 
+            { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, meta.parser_metadata.srcPort, meta.parser_metadata.dstPort }, 
+            FLOW_HASH_MAX_3);
+        hot_flow_counter.read(tmp, (bit<32>)register_idx);
+        hot_flow_counter.write((bit<32>)register_idx, tmp + 1);
+        if (min_count > tmp + 1) { min_count = tmp + 1; }
+        
 
         if (min_count >= THRESHOLD) {
             // apply bloom filter
@@ -420,8 +400,6 @@ control MyEgress(inout headers hdr,
     #define HASH_BASE 19w0
     #define HASH_MAX  19w524287
 
-   
-
     // #define HASH_BASE 20w0
     // #define HASH_MAX  20w1048575
     #define ENTRY_SIZE 524288
@@ -433,7 +411,6 @@ control MyEgress(inout headers hdr,
     bit<64> tmp_read_count;
     bit<64> tmp_store_count;
     
-
     register<bit<256>> (ENTRY_SIZE) fingerprint_store_2;
     register<bit<256>> (ENTRY_SIZE) fingerprint_store;
     register<bit<64>> (1) token_counter;
@@ -445,8 +422,6 @@ control MyEgress(inout headers hdr,
     //register<bit<256>> (ENTRY_SIZE) left_store;
     //register<bit<256>> (ENTRY_SIZE) right_store;
 
-
-   
     // In case of Ingress router
     action initial_setup(){
         meta.custom_metadata.meta_count = 0;
@@ -579,11 +554,34 @@ control MyEgress(inout headers hdr,
          hdr.tre_bitmap.reserved = 0;
     }
 
+    action tre_flag_off() {
+        meta.parser_metadata.enable_tre = FALSE;
+    }
+
+    table is_hot_flow {
+        key = {
+            hdr.ipv4.srcAddr: exact;
+            hdr.ipv4.dstAddr: exact;
+            hdr.ipv4.protocol: exact;
+            meta.parser_metadata.srcPort: exact;
+            meta.parser_metadata.dstPort: exact;
+        }
+        actions = {
+            tre_flag_off;
+            NoAction();
+        }
+        size = 2048;
+        default_action = tre_flag_off;
+    }
+
 //레지스터에서 값 읽어오기 -> 레지스터.read(임시 저장, 인덱스)
 
-    apply{
+    apply {
         selection(INGRESS);
-        if(meta.custom_metadata.selection == 1){ //at ingress switch
+        
+        is_hot_flow.apply();
+
+        if(meta.parser_metadata.enable_tre == TRUE && meta.custom_metadata.selection == INGRESS) { //at ingress switch
             initial_setup();
 
             fingerprinting_32();
@@ -869,16 +867,12 @@ control MyEgress(inout headers hdr,
         }
         /*
         selection(EGRESS)
-        if(meta.custom_metadata.selection == 0) { //at egress switch
+        else if(meta.parser_metadata.enable_tre == TRUE && meta.custom_metadata.selection == EGRESS) { // at egress switch
 
         }
         */  
-
-
-   
- 
+    }
 }
-                 }
 
 
 /*************************************************************************
