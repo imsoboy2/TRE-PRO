@@ -511,9 +511,8 @@ control MyEgress(inout headers hdr,
             } else { // is chunk
                 store_fingerprint(9);
             }
-
-            end_setup();
         }
+        end_setup();
     }
 }
 
