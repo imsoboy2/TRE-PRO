@@ -20,14 +20,33 @@ parser.add_argument('--sp', required=False, type=int, default=1234, help='source
 parser.add_argument('--dp', required=False, type=int, default=5678, help='destination PORT number')
 parser.add_argument('--key', required=False, type=int, default=1111, help='key')
 
-def make_packet(payload):
-	ether = Ether(src=get_if_hwaddr(src_if), dst=get_if_hwaddr(dst_if))
-	ip = IP(dst='127.0.0.1')
-	udp = UDP(dport=1234)
-	custom_header = custom_hdr()
-	pkt = ether / ip / udp / custom_header / payload
-	return pkt
-    
+class entry_hdr(Packet):
+    """ Entry Header """
+    name = "entry"
+    fields_desc = [
+        BitField('flush', 0, 8),
+        BitField('key0', 0, 128),
+        BitField('value0', 1, 32),
+        BitField('key1', 0, 128),
+        BitField('value1', 1, 32),
+        BitField('key2', 0, 128),
+        BitField('value2', 1, 32),
+        BitField('key3', 0, 128),
+        BitField('value3', 1, 32),
+        BitField('key4', 0, 128),
+        BitField('value4', 1, 32),
+        BitField('key5', 0, 128),
+        BitField('value5', 1, 32),
+        BitField('key6', 0, 128),
+        BitField('value6', 1, 32),
+        BitField('key7', 0, 128),
+        BitField('value7', 1, 32),
+        BitField('key8', 0, 128),
+        BitField('value8', 1, 32),
+        BitField('key9', 0, 128),
+        BitField('value9', 1, 32),
+    ]
+
 def main():
     a = parser.parse_args()
 
@@ -40,19 +59,9 @@ def main():
     ip = IP(src=a.si, dst=a.di, proto=17) 
     udp = UDP(sport=a.sp, dport=a.dp)
 
-    for num in range(0, 1):
+    for num in range(0, 200):
     	print('\n---------- Send pakcet ----------')
-    	pkt = ether / ip / udp / '''product/productId: B001E4KFG0
-review/userId: A3SGXH7AUHU8GW
-review/profileName: delmartian
-review/helpfulness: 1/1
-review/score: 5.0
-review/time: 1303862400
-review/summary: Good Quality Dog Food
-review/text: I have bought several of the Vitality canned dog food products and have
-found them all to be of good quality. The product looks more like a stew than a
-processed meat and it smells better. My Labrador is finicky and she appreciates this
-product better than most.'''
+    	pkt = ether / ip / udp / entry_hdr(flush=1)
     	pkt.show()
     	sendp(pkt, iface=iface, verbose=False)
 

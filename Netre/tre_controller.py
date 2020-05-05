@@ -11,18 +11,35 @@ from scapy.layers.inet import _IPOption_HDR
 
 IPV4_PROTOCOL_TCP = 6
 IPV4_PROTOCOL_UDP = 17
+bucket_size = 65536
+hash_base = 0
+hash_max = bucket_size - 1
+num_of_entries = 524288
+cnt = 0
+hot_flow_set = set()
 
 def populate_hot_flow_rule(p):
-    rule = "table_add is_hot_flow NoAction %s %s %d %d %d =>" % (p["srcIP"], p["dstIP"], p["proto"], p["srcPort"], p["dstPort"])
+    global hash_base, hash_max, cnt
+    hot_flow = p["srcIP"] + p["dstIP"] + str(p["proto"]) + str(p["srcPort"]) + str(p["dstPort"])
+    if hot_flow in hot_flow_set: return
+    if num_of_entries <= hash_base: return
+
+    cnt += 1
+    print(cnt, "th flow")
+
+    rule = "table_add is_hot_flow tre_flag_on %s %s %d %d %d => %d %d 0x0A0A0001" % (p["srcIP"], p["dstIP"], p["proto"], p["srcPort"], p["dstPort"], hash_base, hash_max)
     print rule
-    cmd = 'echo \"%s\" | ~/behavioral-model/targets/simple_switch/sswitch_CLI' % rule
+    cmd = 'echo \"%s\" | /home/p4/behavioral-model/targets/simple_switch/sswitch_CLI --thrift-port 9090' % rule
     os.system(cmd)
+    hash_base += bucket_size
+    hash_max += bucket_size
+    hot_flow_set.add(hot_flow)
 
 pkt_5_tuple = {}
 def handle_pkt(pkt):
-    global cnt, empty, pkt_5_tuple
-    pkt.show()
-    hexdump(pkt)
+    global empty, pkt_5_tuple
+    # pkt.show()
+    # hexdump(pkt)
 
     pkt_5_tuple["srcIP"] = pkt[IP].src
     pkt_5_tuple["dstIP"] = pkt[IP].dst
@@ -39,11 +56,11 @@ def handle_pkt(pkt):
     populate_hot_flow_rule(pkt_5_tuple)
 
 def main():
-    ifaces = filter(lambda i: 'veth10' in i, os.listdir('/sys/class/net/'))
+    ifaces = filter(lambda i: 'veth11' in i, os.listdir('/sys/class/net/'))
     iface = ifaces[0]
     print "sniffing on %s" % iface
     sys.stdout.flush()
-    sniff(iface = 'veth10',
+    sniff(iface = 'veth11',
         prn = lambda x: handle_pkt(x))
 
 if __name__ == '__main__':

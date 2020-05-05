@@ -10,14 +10,17 @@ TOPO = topology.json
 P4C = p4c-bm2-ss
 RUN_SCRIPT = ~/tutorials/utils/run_exercise.py
 
-source := test_v3.p4
+source := tre_ingress.p4
 outfile := $(source:.p4=.json)
+source2 := tre_egress.p4
+outfile2 := $(source2:.p4=.json)
 
 compiled_json := $(BUILD_DIR)/$(outfile)
+compiled_json2 := $(BUILD_DIR)/$(outfile2)
 
 # Define NO_P4 to start BMv2 without a program
 ifndef NO_P4
-run_args += -j $(compiled_json)
+run_args += -j $(compiled_json) $(compiled_json2)
 endif
 
 # Set BMV2_SWITCH_EXE to override the BMv2 target
@@ -33,7 +36,7 @@ run: build
 stop:
 	sudo mn -c
 
-build: dirs $(compiled_json)
+build: dirs $(compiled_json) $(compiled_json2)
 
 $(BUILD_DIR)/%.json: ../p4src/%.p4
 	$(P4C) --p4v 16 $(P4C_ARGS) -o $@ $<

@@ -309,7 +309,7 @@ control MyIngress(inout headers hdr,
 
             if (bf0 == 0 || bf2 == 0 || bf2 == 0) {
                 // report flow to controller
-                clone3(CloneType.I2E, CONTROLLER_PORT, { standard_metadata });
+                clone(CloneType.I2E, CONTROLLER_PORT);
                 // -------------------------
                 bloom_filter.write((bit<32>)bf0_idx, 1);
                 bloom_filter.write((bit<32>)bf1_idx, 1);
@@ -369,8 +369,6 @@ control MyEgress(inout headers hdr,
     action initial_setup(){
         meta.custom_metadata.meta_count = 0;
         meta.custom_metadata.meta_bitmap = 0;
-        
-        hdr.tre_bitmap.setValid();
 
         hdr.finger[0].setValid();
         hdr.finger[1].setValid();
@@ -472,6 +470,7 @@ control MyEgress(inout headers hdr,
 
     apply {
         meta.parser_metadata.enable_tre = FALSE;
+        hdr.tre_bitmap.setValid();
         is_hot_flow.apply();
         // meta.parser_metadata.enable_tre = TRUE;
         // meta.custom_metadata.hash_base = 0;
@@ -562,9 +561,9 @@ control MyEgress(inout headers hdr,
             store_counter.write(0, tmp_store_count);
 
             bitmap_gen();
-            end_setup();
             hdr.tre_bitmap.dstSwitchIp = SWITCH_IP;
         }
+        end_setup();
     }
 }
 

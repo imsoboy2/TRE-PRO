@@ -1,0 +1,5 @@
+{
+  "target": "bmv2",
+  "p4info": "../build/tre_egress.p4.p4info.txt",
+  "bmv2_json": "../build/tre_egress.json"
+}
