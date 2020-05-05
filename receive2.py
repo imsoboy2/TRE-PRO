@@ -28,7 +28,7 @@ def handle_pkt(pkt):
     # print(str(pkt[IP].src) + str(pkt[Raw]) + '\n')
     with open("recvpkt", 'a') as f1:
         # byte_array = map(ord, str(pkt[IP].src) + str(pkt[Raw]))
-        f1.write(str(pkt[Raw]) + '\n')
+        f1.write(str(map(ord, str(pkt[Raw]))) + '\n')
     global sum
     sum += len(pkt)
     print 'sum : ', sum

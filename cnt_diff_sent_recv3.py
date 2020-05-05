@@ -16,8 +16,6 @@ while True:
     if not line2: break # no more data, break
     if line2 in pset: samecnt += 1
     else:
-        print 'diff!!!'
-        print line2 
         diffcnt += 1
 
 f2.close()

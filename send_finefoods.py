@@ -38,7 +38,7 @@ def main():
   payload = ''
   ipcnt = 0
   with open("sentpkt", 'w') as f1:
-    for i in range(0, 10):
+    for i in range(0, 2):
       cnt = 0
       with open("finefoods.txt", 'r') as f:
         for line in f:
@@ -48,13 +48,12 @@ def main():
           else:
             # print(payload)
             pkt = make_packet(set_of_ip[ipcnt], payload)
-            time.sleep(0.01)
             pktsum += len(pkt)
             sendp(pkt, iface=dst_if, verbose=False)
             # hexdump(pkt)
             #print(str(pkt[IP].src) + str(pkt[Raw]) + '\n')
             # byte_array = map(ord, str(pkt[IP].src) + str(pkt[Raw]))
-            if ipcnt <= 5000: f1.write(str(pkt[Raw]) + '\n')
+            if ipcnt <= 5000: f1.write(str(map(ord, str(pkt[Raw]))) + '\n')
             payload = ''
             cnt += 1
             ipcnt += 1
