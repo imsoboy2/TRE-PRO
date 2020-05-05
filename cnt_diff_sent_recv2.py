@@ -10,5 +10,8 @@ while True:
     if line1 == line2: samecnt += 1
     else: diffcnt += 1
 
+f1.close()
+f2.close()
+
 print "diff cnt = ", diffcnt
 print "same cnt = ", samecnt

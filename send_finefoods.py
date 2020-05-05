@@ -53,8 +53,8 @@ def main():
             sendp(pkt, iface=dst_if, verbose=False)
             # hexdump(pkt)
             #print(str(pkt[IP].src) + str(pkt[Raw]) + '\n')
-            byte_array = map(ord, str(pkt[IP].src) + str(pkt[Raw]))
-            f1.write(str(byte_array) + '\n')
+            # byte_array = map(ord, str(pkt[IP].src) + str(pkt[Raw]))
+            if ipcnt <= 5000: f1.write(str(pkt[Raw]) + '\n')
             payload = ''
             cnt += 1
             ipcnt += 1
