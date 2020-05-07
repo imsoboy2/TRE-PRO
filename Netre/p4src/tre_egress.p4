@@ -11,6 +11,7 @@
 #define EGRESS  0
 #define TRUE 1
 #define FALSE 0 
+#define null 0x0
 
 const bit<32> SWITCH_IP = 0x0A0A0001;
 
@@ -184,7 +185,7 @@ parser MyParser(packet_in packet,
     ///egress router, chunks, tokens mix
     state parse_tre_select {
         meta.custom_metadata.meta_remainder = (bit<1>)(meta.custom_metadata.meta_bitmap % 2);
-        meta.custom_metadata.meta_bitmap = meta.custom_metadata.meta_bitmap / 2;
+        meta.custom_metadata.meta_bitmap = meta.custom_metadata.meta_bitmap >> 1;
         
         transition select(meta.custom_metadata.meta_remainder) {
             1 : parse_token;
@@ -448,64 +449,65 @@ control MyEgress(inout headers hdr,
         if(meta.parser_metadata.enable_tre == TRUE) { // at egress switch
             if (hdr.tre_bitmap.bitmap[0:0] == 0x1) { // is token
                 restore_token(0, hdr.u_chunk_token[0].token.token_index);
-            } else { // is chunk
+            } else if (hdr.u_chunk_token[0].chunk.isValid()){
                 store_fingerprint(0);
             }
 
             if (hdr.tre_bitmap.bitmap[1:1] == 0x1) { // is token
                 restore_token(1, hdr.u_chunk_token[1].token.token_index);
-            } else { // is chunk
+            } else if (hdr.u_chunk_token[1].chunk.isValid()){
                 store_fingerprint(1);
             }
 
             if (hdr.tre_bitmap.bitmap[2:2] == 0x1) { // is token
                 restore_token(2, hdr.u_chunk_token[2].token.token_index);
-            } else { // is chunk
+            } else if (hdr.u_chunk_token[2].chunk.isValid()){
                 store_fingerprint(2);
             }
 
             if (hdr.tre_bitmap.bitmap[3:3] == 0x1) { // is token
                 restore_token(3, hdr.u_chunk_token[3].token.token_index);
-            } else { // is chunk
+            } else if (hdr.u_chunk_token[3].chunk.isValid()){
                 store_fingerprint(3);
             }
 
             if (hdr.tre_bitmap.bitmap[4:4] == 0x1) { // is token
                 restore_token(4, hdr.u_chunk_token[4].token.token_index);
-            } else { // is chunk
+            } else if (hdr.u_chunk_token[4].chunk.isValid()){
                 store_fingerprint(4);
             }
 
             if (hdr.tre_bitmap.bitmap[5:5] == 0x1) { // is token
                 restore_token(5, hdr.u_chunk_token[5].token.token_index);
-            } else { // is chunk
+            } else if (hdr.u_chunk_token[5].chunk.isValid()){
                 store_fingerprint(5);
             }
 
             if (hdr.tre_bitmap.bitmap[6:6] == 0x1) { // is token
                 restore_token(6, hdr.u_chunk_token[6].token.token_index);
-            } else { // is chunk
+            } else if (hdr.u_chunk_token[6].chunk.isValid()){
                 store_fingerprint(6);
             }
 
             if (hdr.tre_bitmap.bitmap[7:7] == 0x1) { // is token
                 restore_token(7, hdr.u_chunk_token[7].token.token_index);
-            } else { // is chunk
+            } else if (hdr.u_chunk_token[7].chunk.isValid()){
                 store_fingerprint(7);
             }
 
             if (hdr.tre_bitmap.bitmap[8:8] == 0x1) { // is token
                 restore_token(8, hdr.u_chunk_token[8].token.token_index);
-            } else { // is chunk
+            } else if (hdr.u_chunk_token[8].chunk.isValid()){
                 store_fingerprint(8);
             }
 
             if (hdr.tre_bitmap.bitmap[9:9] == 0x1) { // is token
                 restore_token(9, hdr.u_chunk_token[9].token.token_index);
-            } else { // is chunk
+            } else if (hdr.u_chunk_token[9].chunk.isValid()){
                 store_fingerprint(9);
             }
         }
+
         end_setup();
     }
 }

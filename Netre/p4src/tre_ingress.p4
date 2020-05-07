@@ -255,6 +255,7 @@ control MyIngress(inout headers hdr,
     register<bit<1>>(FLOW_REGISTER_SIZE) bloom_filter;
 
     apply {
+ 
         /* ----------------------- find hot flow ----------------------- */
         bit<16> register_idx;
         bit<10> tmp = 0;
@@ -487,73 +488,93 @@ control MyEgress(inout headers hdr,
             store_counter.read(tmp_store_count, 0);
        
             store_read(0);
-            if(tmp_finger_value == hdr.u_chunk_token[0].chunk.chunk_payload) { // cache hit
-                tokenization(0);
-            } else { // register is empty or hash collision
-                store_fingerprint(0); // overwrite
+            if (hdr.u_chunk_token[0].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[0].chunk.chunk_payload) { // cache hit
+                    tokenization(0);
+                } else { // register is empty or hash collision
+                    store_fingerprint(0); // overwrite
+                }
             }
-        
+            
             store_read(1);
-            if(tmp_finger_value == hdr.u_chunk_token[1].chunk.chunk_payload) { // cache hit
-                tokenization(1);
-            } else { // register is empty or hash collision
-                store_fingerprint(1); // overwrite
+            if (hdr.u_chunk_token[1].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[1].chunk.chunk_payload) { // cache hit
+                    tokenization(1);
+                } else { // register is empty or hash collision
+                    store_fingerprint(1); // overwrite
+                }
             }
 
             store_read(2);
-            if(tmp_finger_value == hdr.u_chunk_token[2].chunk.chunk_payload) { // cache hit
-                tokenization(2);
-            } else { // register is empty or hash collision
-                store_fingerprint(2); // overwrite
+            if (hdr.u_chunk_token[2].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[2].chunk.chunk_payload) { // cache hit
+                    tokenization(2);
+                } else { // register is empty or hash collision
+                    store_fingerprint(2); // overwrite
+                }
             }
 
             store_read(3);
-            if(tmp_finger_value == hdr.u_chunk_token[3].chunk.chunk_payload) { // cache hit
-                tokenization(3);
-            } else { // register is empty or hash collision
-                store_fingerprint(3); // overwrite
+            if (hdr.u_chunk_token[3].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[3].chunk.chunk_payload) { // cache hit
+                    tokenization(3);
+                } else { // register is empty or hash collision
+                    store_fingerprint(3); // overwrite
+                }
             }
 
             store_read(4);
-            if(tmp_finger_value == hdr.u_chunk_token[4].chunk.chunk_payload) { // cache hit
-                tokenization(4);
-            } else { // register is empty or hash collision
-                store_fingerprint(4); // overwrite
+            if (hdr.u_chunk_token[4].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[4].chunk.chunk_payload) { // cache hit
+                    tokenization(4);
+                } else { // register is empty or hash collision
+                    store_fingerprint(4); // overwrite
+                }
             }
 
             store_read(5);
-            if(tmp_finger_value == hdr.u_chunk_token[5].chunk.chunk_payload) { // cache hit
-                tokenization(5);
-            } else { // register is empty or hash collision
-                store_fingerprint(5); // overwrite
+            if (hdr.u_chunk_token[5].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[5].chunk.chunk_payload) { // cache hit
+                    tokenization(5);
+                } else { // register is empty or hash collision
+                    store_fingerprint(5); // overwrite
+                }
             }
 
             store_read(6);
-            if(tmp_finger_value == hdr.u_chunk_token[6].chunk.chunk_payload) { // cache hit
-                tokenization(6);
-            } else { // register is empty or hash collision
-                store_fingerprint(6); // overwrite
+            if (hdr.u_chunk_token[6].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[6].chunk.chunk_payload) { // cache hit
+                    tokenization(6);
+                } else { // register is empty or hash collision
+                    store_fingerprint(6); // overwrite
+                }
             }
 
             store_read(7);
-            if(tmp_finger_value == hdr.u_chunk_token[7].chunk.chunk_payload) { // cache hit
-                tokenization(7);
-            } else { // register is empty or hash collision
-                store_fingerprint(7); // overwrite
+            if (hdr.u_chunk_token[7].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[7].chunk.chunk_payload) { // cache hit
+                    tokenization(7);
+                } else { // register is empty or hash collision
+                    store_fingerprint(7); // overwrite
+                }
             }
 
             store_read(8);
-            if(tmp_finger_value == hdr.u_chunk_token[8].chunk.chunk_payload) { // cache hit
-                tokenization(8);
-            } else { // register is empty or hash collision
-                store_fingerprint(8); // overwrite
+            if (hdr.u_chunk_token[8].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[8].chunk.chunk_payload) { // cache hit
+                    tokenization(8);
+                } else { // register is empty or hash collision
+                    store_fingerprint(8); // overwrite
+                }
             }
 
             store_read(9);
-            if(tmp_finger_value == hdr.u_chunk_token[9].chunk.chunk_payload) { // cache hit
-                tokenization(9);
-            } else { // register is empty or hash collision
-                store_fingerprint(9); // overwrite
+            if (hdr.u_chunk_token[9].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[9].chunk.chunk_payload) { // cache hit
+                    tokenization(9);
+                } else { // register is empty or hash collision
+                    store_fingerprint(9); // overwrite
+                }
             }
 
             hash_collision_counter.write(0, tmp_hash_collision_count); //hash_collision
