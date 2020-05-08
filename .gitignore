@@ -1,3 +1,6 @@
-build/
-p4runtime/logs/
-p4runtime/pcaps/
+Netre/p4runtime/logs/
+Netre/p4runtime/pcaps/
+sentpkt
+recvpkt
+tmp
+finefoods.txt
