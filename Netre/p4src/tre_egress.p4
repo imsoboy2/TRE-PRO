@@ -13,6 +13,7 @@
 #define FALSE 0 
 #define null 0x0
 
+
 const bit<32> SWITCH_IP = 0x0A0A0001;
 
 header ethernet_t {
@@ -83,9 +84,9 @@ header finger_t {
 struct headers {
     ethernet_t ethernet;
     ipv4_t     ipv4;
+    tre_bitmap_t tre_bitmap;
     tcp_t      tcp;
     udp_t      udp; 
-    tre_bitmap_t tre_bitmap;
     u_chunk_token[MAX_LEN] u_chunk_token;
     finger_t[MAX_LEN] finger;
 }
@@ -146,27 +147,37 @@ parser MyParser(packet_in packet,
 
 #define IPV4_PROTOCOL_TCP 6
 #define IPV4_PROTOCOL_UDP 17
+#define SHIM_TCP 77
+#define SHIM_UDP 78
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
         transition select(hdr.ipv4.protocol) {
             IPV4_PROTOCOL_TCP : parse_tcp;
-            IPV4_PROTOCOL_UDP : parse_udp;   
+            IPV4_PROTOCOL_UDP : parse_udp;
+            SHIM_TCP: parse_tcp;
+            SHIM_UDP: parse_udp;   
             default: accept;
         }
     }
 
     state parse_tcp {
+        packet.extract(hdr.tcp);
         meta.parser_metadata.srcPort = hdr.tcp.srcPort; 
         meta.parser_metadata.dstPort = hdr.tcp.dstPort;
-        packet.extract(hdr.tcp);
-        transition parse_tre_bitmap;
+        transition select(hdr.ipv4.protocol) {
+            SHIM_TCP: parse_tre_bitmap;
+            default: accept;
+        }
     }
      state parse_udp {
+        packet.extract(hdr.udp);
         meta.parser_metadata.srcPort = hdr.udp.srcPort;
         meta.parser_metadata.dstPort = hdr.udp.dstPort;
-        packet.extract(hdr.udp);
-        transition parse_tre_bitmap;
+        transition select(hdr.ipv4.protocol) {
+            SHIM_UDP: parse_tre_bitmap;
+            default: accept;
+        }
     }
 
    ///////////////////hdr.tre_bitmap.bitmap enter reversed order
@@ -175,11 +186,7 @@ parser MyParser(packet_in packet,
         meta.custom_metadata.meta_bitmap = hdr.tre_bitmap.bitmap;
 
         meta.parser_metadata.enable_tre = TRUE;
-        
-        transition select(hdr.tre_bitmap.dstSwitchIp) {
-            SWITCH_IP : parse_tre_select;
-            default : accept;
-        }
+        transition parse_tre_select;
     }
     
     ///egress router, chunks, tokens mix
@@ -506,8 +513,11 @@ control MyEgress(inout headers hdr,
             } else if (hdr.u_chunk_token[9].chunk.isValid()){
                 store_fingerprint(9);
             }
-        }
 
+            if (hdr.ipv4.protocol == SHIM_TCP) { hdr.ipv4.protocol = IPV4_PROTOCOL_TCP; }
+            else if (hdr.ipv4.protocol == SHIM_UDP) { hdr.ipv4.protocol = IPV4_PROTOCOL_UDP; }
+        }
+        hdr.tre_bitmap.setInvalid();
         end_setup();
     }
 }

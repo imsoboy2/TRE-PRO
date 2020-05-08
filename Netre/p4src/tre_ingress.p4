@@ -9,6 +9,8 @@
 #define MAX_LEN 10 
 #define TRUE 1
 #define FALSE 0 
+#define SHIM_TCP 77
+#define SHIM_UDP 78
 
 header ethernet_t {
     bit<48> dstAddr;
@@ -370,7 +372,7 @@ control MyEgress(inout headers hdr,
     action initial_setup(){
         meta.custom_metadata.meta_count = 0;
         meta.custom_metadata.meta_bitmap = 0;
-
+        hdr.tre_bitmap.setValid();
         hdr.finger[0].setValid();
         hdr.finger[1].setValid();
         hdr.finger[2].setValid();
@@ -471,15 +473,16 @@ control MyEgress(inout headers hdr,
 
     apply {
         meta.parser_metadata.enable_tre = FALSE;
-        hdr.tre_bitmap.setValid();
         is_hot_flow.apply();
         // meta.parser_metadata.enable_tre = TRUE;
         // meta.custom_metadata.hash_base = 0;
         // meta.custom_metadata.hash_max = 524287;
         
-
         if (meta.parser_metadata.enable_tre == TRUE) { // at ingress switch
             initial_setup();
+            
+            if (hdr.ipv4.protocol == IPV4_PROTOCOL_TCP) { hdr.ipv4.protocol = SHIM_TCP; }
+            else if (hdr.ipv4.protocol == IPV4_PROTOCOL_UDP) { hdr.ipv4.protocol = SHIM_UDP; }
 
             fingerprinting(meta.custom_metadata.hash_base, meta.custom_metadata.hash_max); 
 
@@ -598,7 +601,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
         packet.emit(hdr.udp);
-        packet.emit(hdr.tcp);
+        packet.emit(hdr.tcp);        
         packet.emit(hdr.tre_bitmap);
         packet.emit(hdr.u_chunk_token[0].chunk);
         packet.emit(hdr.u_chunk_token[0].token);

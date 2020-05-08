@@ -18,6 +18,24 @@ num_of_entries = 524288
 cnt = 0
 hot_flow_set = set()
 
+SHIM_TCP = 77
+SHIM_UDP = 78
+
+class custom_hdr(Packet):
+    """Custom Header"""
+    name = 'custom_hdr'
+    fields_desc = [
+        BitField('bitmap', 0, 10),
+        BitField('dstIP', 0, 32),
+        BitField('reserved', 0, 6)
+    ]
+
+bind_layers(IP, UDP, proto=SHIM_UDP)
+bind_layers(IP, TCP, proto=SHIM_TCP)
+
+bind_layers(UDP, custom_hdr)
+bind_layers(TCP, custom_hdr)
+
 def populate_hot_flow_rule(p):
     global hash_base, hash_max, cnt
     hot_flow = p["srcIP"] + p["dstIP"] + str(p["proto"]) + str(p["srcPort"]) + str(p["dstPort"])
@@ -36,6 +54,8 @@ def populate_hot_flow_rule(p):
     hot_flow_set.add(hot_flow)
 
 pkt_5_tuple = {}
+
+
 def handle_pkt(pkt):
     global empty, pkt_5_tuple
     # pkt.show()
@@ -46,11 +66,15 @@ def handle_pkt(pkt):
     pkt_5_tuple["proto"] = pkt[IP].proto
 
     if pkt[IP].proto == IPV4_PROTOCOL_TCP:
+        pkt_5_tuple["proto"] = SHIM_TCP
         pkt_5_tuple["srcPort"] = pkt[TCP].sport
         pkt_5_tuple["dstPort"] = pkt[TCP].dport
-    else:
+    elif pkt[IP].proto == IPV4_PROTOCOL_UDP:
+        pkt_5_tuple["proto"] = SHIM_UDP
         pkt_5_tuple["srcPort"] = pkt[UDP].sport
         pkt_5_tuple["dstPort"] = pkt[UDP].dport
+    else:
+        return
 
     print pkt_5_tuple
     populate_hot_flow_rule(pkt_5_tuple)

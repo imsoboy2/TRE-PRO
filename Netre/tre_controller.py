@@ -2,6 +2,7 @@
 import sys
 import struct
 import os
+import time
 
 from scapy.all import sniff, sendp, hexdump, get_if_list, get_if_hwaddr, bind_layers
 from scapy.all import Packet, IPOption
@@ -18,6 +19,24 @@ num_of_entries = 524288
 cnt = 0
 hot_flow_set = set()
 
+SHIM_TCP = 77
+SHIM_UDP = 78
+
+class custom_hdr(Packet):
+    """Custom Header"""
+    name = 'custom_hdr'
+    fields_desc = [
+        BitField('bitmap', 0, 10),
+        BitField('dstIP', 0, 32),
+        BitField('reserved', 0, 6)
+    ]
+
+bind_layers(IP, UDP, proto=SHIM_UDP)
+bind_layers(IP, TCP, proto=SHIM_TCP)
+
+bind_layers(UDP, custom_hdr)
+bind_layers(TCP, custom_hdr)
+
 def populate_hot_flow_rule(p):
     global hash_base, hash_max, cnt
     hot_flow = p["srcIP"] + p["dstIP"] + str(p["proto"]) + str(p["srcPort"]) + str(p["dstPort"])
@@ -30,6 +49,7 @@ def populate_hot_flow_rule(p):
     rule = "table_add is_hot_flow tre_flag_on %s %s %d %d %d => %d %d 0x0A0A0001" % (p["srcIP"], p["dstIP"], p["proto"], p["srcPort"], p["dstPort"], hash_base, hash_max)
     print rule
     cmd = 'echo \"%s\" | /home/p4/behavioral-model/targets/simple_switch/sswitch_CLI --thrift-port 9090' % rule
+    time.sleep(0.5)
     os.system(cmd)
     hash_base += bucket_size
     hash_max += bucket_size
@@ -48,7 +68,13 @@ def handle_pkt(pkt):
     if pkt[IP].proto == IPV4_PROTOCOL_TCP:
         pkt_5_tuple["srcPort"] = pkt[TCP].sport
         pkt_5_tuple["dstPort"] = pkt[TCP].dport
-    else:
+    elif pkt[IP].proto == IPV4_PROTOCOL_UDP:
+        pkt_5_tuple["srcPort"] = pkt[UDP].sport
+        pkt_5_tuple["dstPort"] = pkt[UDP].dport
+    elif pkt[IP].proto == SHIM_TCP:
+        pkt_5_tuple["srcPort"] = pkt[TCP].sport
+        pkt_5_tuple["dstPort"] = pkt[TCP].dport
+    elif pkt[IP].proto == SHIM_UDP:
         pkt_5_tuple["srcPort"] = pkt[UDP].sport
         pkt_5_tuple["dstPort"] = pkt[UDP].dport
 

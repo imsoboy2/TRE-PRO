@@ -3,7 +3,7 @@ import scipy.stats as ss
 import numpy as np
 
 d_min = 1; d_max = 100; d_avg = (d_min + d_max) / 2
-num_of_data = 50000
+num_of_data = 10000
 
 dist = input('[u]niform or [g]aussian or [z]ipf? : ')
 
@@ -23,7 +23,7 @@ elif dist == 'z':
   x = np.arange(d_min, d_max + 1)
   print(x)
 
-  p = ss.zipf.pmf(x, a = 10)
+  p = ss.zipf.pmf(x, a = 1.5)
   p /= p.sum()
   n = np.random.choice(x, size = num_of_data, p = p)
 

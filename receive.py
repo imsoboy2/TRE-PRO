@@ -24,10 +24,9 @@ IPV4_PROTOCOL_UDP = 17
 
 pktsum = 0
 def handle_pkt(pkt):
-
     global pktsum
     # pkt.show()
-    #hexdump(pkt)
+    hexdump(pkt)
     pktsum += len(pkt)
     print(pktsum)
 

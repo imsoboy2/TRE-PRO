@@ -18,6 +18,16 @@ import readline
 dst_if = 'veth1'
 
 pktsum = 0
+class custom_hdr(Packet):
+    """Custom Header"""
+    name = 'custom_hdr'
+    fields_desc = [
+        BitField('bitmap', 0, 10),
+        BitField('dstIP', 0, 32),
+        BitField('reserved', 0, 6)
+    ]
+bind_layers(UDP, custom_hdr)
+
 def make_packet(srcip, payload):
   ether = Ether(dst=get_if_hwaddr(dst_if))
   ip = IP(src=srcip, dst='10.10.0.200')
@@ -25,10 +35,14 @@ def make_packet(srcip, payload):
   pkt = ether / ip / udp / payload
   return pkt
 
+NUM_OF_PAYLOAD = 5000
+LOOP_CNT = 2
+# the # of packets is NUM_OF_PAYLOAD * LOOP_CNT
+
 def main():
   global pktsum
   set_of_ip = []
-  with open('g_dist', 'r') as f:
+  with open('z_dist', 'r') as f:
     while True:
       line = f.readline()
       set_of_ip.append(line.strip())
@@ -38,26 +52,22 @@ def main():
   payload = ''
   ipcnt = 0
   with open("sentpkt", 'w') as f1:
-    for i in range(0, 2):
+    for i in range(0, LOOP_CNT):
       cnt = 0
       with open("finefoods.txt", 'r') as f:
         for line in f:
-          if cnt >= 5000: break
+          if cnt >= NUM_OF_PAYLOAD: break
           if line.strip():
             payload += line
           else:
-            # print(payload)
             pkt = make_packet(set_of_ip[ipcnt], payload)
             pktsum += len(pkt)
             sendp(pkt, iface=dst_if, verbose=False)
-            # hexdump(pkt)
-            #print(str(pkt[IP].src) + str(pkt[Raw]) + '\n')
-            # byte_array = map(ord, str(pkt[IP].src) + str(pkt[Raw]))
-            if ipcnt <= 5000: f1.write(str(map(ord, str(pkt[Raw]))) + '\n')
+            if ipcnt <= NUM_OF_PAYLOAD: f1.write(str(pkt[Raw]) + '\n')
             payload = ''
             cnt += 1
             ipcnt += 1
-            print("--- cnt: ", cnt)
+            print("--- cnt: ", ipcnt)
             print(pktsum) 
 
 if __name__ == '__main__':
