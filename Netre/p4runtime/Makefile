@@ -10,7 +10,7 @@ TOPO = topology.json
 P4C = p4c-bm2-ss
 RUN_SCRIPT = ~/tutorials/utils/run_exercise.py
 
-SOURCES = ../build/tre_ingress.json ../build/tre_egress.json
+SOURCES = ../build/tre_ingress.json ../build/tre_egress.json ../build/basic.json
 source := $(wildcard *.p4)
 outfile := $(source:.p4=.json)
 
@@ -40,6 +40,9 @@ build: dirs $(SOURCES)
 	$(P4C) --target bmv2 --p4v 16 $(P4C_ARGS) -o $@ $<
 
 ../build/tre_egress.json: ../p4src/tre_egress.p4
+	$(P4C) --target bmv2 --p4v 16 $(P4C_ARGS) -o $@ $<
+
+../build/basic.json: ../p4src/basic.p4
 	$(P4C) --target bmv2 --p4v 16 $(P4C_ARGS) -o $@ $<
 
 dirs:

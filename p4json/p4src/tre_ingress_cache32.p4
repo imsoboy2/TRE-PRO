@@ -110,8 +110,8 @@ struct custom_metadata_t {
     bit<32> test_32;
     bit<256> test_256;
 
-    bit<19> hash_base;
-    bit<19> hash_max;
+    bit<20> hash_base;
+    bit<20> hash_max;
 }
 
 struct metadata {
@@ -351,7 +351,7 @@ control MyEgress(inout headers hdr,
 
     // #define HASH_BASE 20w0
     // #define HASH_MAX  20w1048575
-    #define ENTRY_SIZE 524288
+    #define ENTRY_SIZE 1048576
   
     bit<256> tmp_finger_value;
     bit<64> tmp_count;
@@ -399,7 +399,7 @@ control MyEgress(inout headers hdr,
         hdr.finger[9].setInvalid();
    }
 
-    action fingerprinting(bit<19> hash_base, bit<19> hash_max) {
+    action fingerprinting(bit<20> hash_base, bit<20> hash_max) {
         hash(hdr.finger[0].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[0].chunk}, hash_max); 
         hash(hdr.finger[1].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[1].chunk}, hash_max); 
         hash(hdr.finger[2].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[2].chunk}, hash_max); 
@@ -440,7 +440,7 @@ control MyEgress(inout headers hdr,
          hdr.tre_bitmap.reserved = 0;
     }
 
-    action tre_flag_on(bit<19> b, bit<19> m, bit<32> dstSwitchIp) {
+    action tre_flag_on(bit<20> b, bit<20> m, bit<32> dstSwitchIp) {
         meta.parser_metadata.enable_tre = TRUE;
         meta.custom_metadata.hash_base = b;
         meta.custom_metadata.hash_max = m;

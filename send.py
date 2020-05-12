@@ -31,7 +31,7 @@ def make_packet(payload):
 def main():
     a = parser.parse_args()
 
-    iface = "veth1"
+    iface = "enp0s3"
 
     range_bottom = 1
     range_top = 100000
@@ -40,7 +40,7 @@ def main():
     ip = IP(src=a.si, dst=a.di, proto=17) 
     udp = UDP(sport=a.sp, dport=a.dp)
 
-    for num in range(0, 1):
+    for num in range(0, 10000):
     	print('\n---------- Send pakcet ----------')
     	pkt = ether / ip / udp / '''product/productId: B001E4KFG0
 review/userId: A3SGXH7AUHU8GW

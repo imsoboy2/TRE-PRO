@@ -26,7 +26,7 @@ sum = 0
 
 def handle_pkt(pkt):
     # print(str(pkt[IP].src) + str(pkt[Raw]) + '\n')
-    with open("results/retransmission/recvpkt", 'a') as f1:
+    with open("results/retransmission/recvpkt2", 'a') as f1:
         # byte_array = map(ord, str(pkt[IP].src) + str(pkt[Raw]))
         if pkt[Raw]:
             f1.write(str(pkt[Raw]) + '\n')

@@ -3,7 +3,7 @@ import scipy.stats as ss
 import numpy as np
 
 d_min = 1; d_max = 100; d_avg = (d_min + d_max) / 2
-num_of_data = 10000
+num_of_data = 200
 
 dist = input('[u]niform or [g]aussian or [z]ipf? : ')
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import argparse
 import sys
 import struct
 import os
@@ -23,37 +22,23 @@ bind_layers(UDP, custom_hdr)
 IPV4_PROTOCOL_TCP = 6
 IPV4_PROTOCOL_UDP = 17
 
-parser = argparse.ArgumentParser(description='send packets')
-parser.add_argument('--fname', required=True, default='', help='name of saved file')
-
-pktcnt = 0
 pktsum = 0
-fname = ''
 def handle_pkt(pkt):
-    global pktsum, pktcnt
+    global pktsum
     # pkt.show()
-
-    with open("results/reduction/recvsum_" + fname, "w") as f:
-        f.write("pktcnt = " + str(pktcnt) + "\n")
-        f.write("pktsum = " + str(pktsum) + "\n")
-
-    # hexdump(pkt)
+    hexdump(pkt)
     pktsum += len(pkt)
-    pktcnt += 1
-    # print(pktsum)
+    print(pktsum)
 
 def main():
-    global fname
-    a = parser.parse_args()
-    fname = a.fname
-
     # interface = 'veth0'
-    interface = 'veth3'
+    interface = 'veth'
     ifaces = filter(lambda i: interface in i, os.listdir('/sys/class/net/'))
-    iface = ifaces[0]
-    print "sniffing on %s" % iface
+    # iface = ifaces[0]
+    print "sniffing on %s" % ifaces
     sys.stdout.flush()
-    sniff(iface = interface,
+    print(ifaces)
+    sniff(iface = ifaces,
         prn = lambda x: handle_pkt(x))
 
 if __name__ == '__main__':

@@ -15,12 +15,12 @@ from scapy.all import Ether, IP, UDP, TCP, Raw
 from scapy.all import bind_layers
 import readline
 
-dst_if = 'veth1'
+dst_if = 'veth13'
 
 parser = argparse.ArgumentParser(description='send packets')
 parser.add_argument('--fname', required=True, default='', help='name of saved file')
 parser.add_argument('--dist', required=False, default='z_dist', help='flow distribution')
-parser.add_argument('--pktnum', type=int, required=False, default=1000, help='number of packets')
+parser.add_argument('--pktnum', type=int, required=False, default=0, help='number of packets')
 
 pktsum = 0
 
@@ -43,7 +43,7 @@ def main():
   NUM_OF_PAYLOAD = int(a.pktnum)
 
   set_of_ip = []
-  with open(a.dist + str(NUM_OF_PAYLOAD), 'r') as f:
+  with open(a.dist + '3_' + str(NUM_OF_PAYLOAD), 'r') as f:
     while True:
       line = f.readline()
       set_of_ip.append(line.strip())
@@ -57,13 +57,13 @@ def main():
 
   plist = []
   flowcnt = []
-  with open("finefoods.txt", 'r') as f:
-    for i in range(100):
+  with open("finefoods3.txt", 'r') as f:
+    for i in range(1000):
       flowcnt.append(0)
       cnt = 0
       plist.append([])
       for line in f:
-        if cnt >= 10: break
+        if cnt >= 1: break
         if line.strip():
           payload += line
         else:
@@ -75,15 +75,25 @@ def main():
           payload = ''
           cnt += 1
 
-  for i in range(len(set_of_ip)):
-    idx = int(set_of_ip[i][8:])
-    idx = 2
-    payload = plist[idx][flowcnt[idx]]
-    pkt = make_packet(set_of_ip[idx], payload)
-    pktsum += len(pkt)
-    sendp(pkt, iface=dst_if, verbose=False)
-    flowcnt[idx] = (flowcnt[idx] + 1) % 10
-    ipcnt += 1
+  print(len(plist))
+  print(len(flowcnt))
+
+  f1 = open("results/retransmission/sentpkt_" + a.fname, "w")         
+  for j in range(1):        
+    for i in range(len(set_of_ip)):
+      idx = int(set_of_ip[i], 16) - 2000
+      classC = int(set_of_ip[i][0:2], 16)
+      classD = int(set_of_ip[i][2:4], 16)
+      srcip = '10.0.%d.%d' % (classC, classD)
+      payload = plist[idx][flowcnt[idx]]
+      pkt = make_packet(srcip, payload)
+      pktsum += len(pkt)
+      time.sleep(0.01)
+      sendp(pkt, iface=dst_if, verbose=False)
+      if j == 0: f1.write(str(pkt[Raw]) + '\n')
+      flowcnt[idx] = (flowcnt[idx] + 1) % 1
+      ipcnt += 1
+  f1.close()
 
   with open("results/reduction/sentsum_" + a.fname, "w") as f:
     f.write("pktcnt = " + str(ipcnt) + "\n")

@@ -6,7 +6,7 @@
 *********************** H E A D E R S  ***********************************
 *************************************************************************/
 
-#define MAX_LEN 10 
+#define MAX_LEN 20 
 #define TRUE 1
 #define FALSE 0 
 #define SHIM_TCP 77
@@ -55,14 +55,14 @@ header udp_t {
 }
 
 header tre_bitmap_t {
-    bit<10> bitmap;
+    bit<20> bitmap;
     bit<32> dstSwitchIp;
-    bit<4> bitmapsize;
-    bit<2> reserved;
+    bit<5> bitmapsize;
+    bit<7> reserved;
 }
 
 header chunk_t {
-    bit<256> chunk_payload;
+    bit<128> chunk_payload;
 }
 
 header token_t {
@@ -90,7 +90,7 @@ struct headers {
 
 struct parser_metadata_t {
     bit<1> enable_tre;
-    bit<4> remaining;
+    bit<5> remaining;
 
     bit<16> srcPort;
     bit<16> dstPort;
@@ -98,9 +98,9 @@ struct parser_metadata_t {
 
 struct custom_metadata_t {
     bit<5> meta_count;
-    bit<10> meta_bitmap;
+    bit<20> meta_bitmap;
     bit<1> meta_remainder;
-    bit<10> mb;
+    bit<20> mb;
 
     bit<32>  fingerprint;
     bit<256> value;
@@ -110,8 +110,8 @@ struct custom_metadata_t {
     bit<32> test_32;
     bit<256> test_256;
 
-    bit<19> hash_base;
-    bit<19> hash_max;
+    bit<20> hash_base;
+    bit<20> hash_max;
 }
 
 struct metadata {
@@ -346,20 +346,20 @@ control MyEgress(inout headers hdr,
     //#define HASH_BASE 16w0
     //#define HASH_MAX  16w65535
 
-    #define HASH_BASE 19w0
-    #define HASH_MAX  19w524287
+    #define HASH_BASE 20w0
+    #define HASH_MAX  20w1048575
 
     // #define HASH_BASE 20w0
     // #define HASH_MAX  20w1048575
-    #define ENTRY_SIZE 524288
+    #define ENTRY_SIZE 1048576
   
-    bit<256> tmp_finger_value;
+    bit<128> tmp_finger_value;
     bit<64> tmp_count;
     bit<64> tmp_hash_collision_count; //hash_collision
     bit<64> tmp_read_count;
     bit<64> tmp_store_count;
     
-    register<bit<256>> (ENTRY_SIZE) fingerprint_store;
+    register<bit<128>> (ENTRY_SIZE) fingerprint_store;
     register<bit<64>> (1) token_counter;
     register<bit<64>> (1) hash_collision_counter;
     //hash_collision
@@ -384,6 +384,16 @@ control MyEgress(inout headers hdr,
         hdr.finger[7].setValid();
         hdr.finger[8].setValid();
         hdr.finger[9].setValid();
+        hdr.finger[10].setValid();
+        hdr.finger[11].setValid();
+        hdr.finger[12].setValid();
+        hdr.finger[13].setValid();
+        hdr.finger[14].setValid();
+        hdr.finger[15].setValid();
+        hdr.finger[16].setValid();
+        hdr.finger[17].setValid();
+        hdr.finger[18].setValid();
+        hdr.finger[19].setValid();
     }
 
     action end_setup(){
@@ -397,9 +407,19 @@ control MyEgress(inout headers hdr,
         hdr.finger[7].setInvalid();
         hdr.finger[8].setInvalid();
         hdr.finger[9].setInvalid();
+        hdr.finger[10].setInvalid();
+        hdr.finger[11].setInvalid();
+        hdr.finger[12].setInvalid();
+        hdr.finger[13].setInvalid();
+        hdr.finger[14].setInvalid();
+        hdr.finger[15].setInvalid();
+        hdr.finger[16].setInvalid();
+        hdr.finger[17].setInvalid();
+        hdr.finger[18].setInvalid();
+        hdr.finger[19].setInvalid();
    }
 
-    action fingerprinting(bit<19> hash_base, bit<19> hash_max) {
+    action fingerprinting(bit<20> hash_base, bit<20> hash_max) {
         hash(hdr.finger[0].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[0].chunk}, hash_max); 
         hash(hdr.finger[1].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[1].chunk}, hash_max); 
         hash(hdr.finger[2].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[2].chunk}, hash_max); 
@@ -409,15 +429,25 @@ control MyEgress(inout headers hdr,
         hash(hdr.finger[6].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[6].chunk}, hash_max); 
         hash(hdr.finger[7].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[7].chunk}, hash_max); 
         hash(hdr.finger[8].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[8].chunk}, hash_max); 
-        hash(hdr.finger[9].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[9].chunk}, hash_max); 
+        hash(hdr.finger[9].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[9].chunk}, hash_max);
+        hash(hdr.finger[10].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[10].chunk}, hash_max); 
+        hash(hdr.finger[11].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[11].chunk}, hash_max); 
+        hash(hdr.finger[12].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[12].chunk}, hash_max); 
+        hash(hdr.finger[13].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[13].chunk}, hash_max); 
+        hash(hdr.finger[14].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[14].chunk}, hash_max); 
+        hash(hdr.finger[15].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[15].chunk}, hash_max); 
+        hash(hdr.finger[16].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[16].chunk}, hash_max); 
+        hash(hdr.finger[17].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[17].chunk}, hash_max); 
+        hash(hdr.finger[18].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[18].chunk}, hash_max); 
+        hash(hdr.finger[19].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[19].chunk}, hash_max);  
     }
 
-    action store_read(bit<4> X) {
+    action store_read(bit<5> X) {
         fingerprint_store.read(tmp_finger_value, hdr.finger[X].finger);
         tmp_read_count = tmp_read_count + 1;
     }
 
-    action store_fingerprint(bit<4> Y) {
+    action store_fingerprint(bit<5> Y) {
         fingerprint_store.write(hdr.finger[Y].finger, hdr.u_chunk_token[Y].chunk.chunk_payload);
         tmp_store_count = tmp_store_count + 1;
     }
@@ -440,7 +470,7 @@ control MyEgress(inout headers hdr,
          hdr.tre_bitmap.reserved = 0;
     }
 
-    action tre_flag_on(bit<19> b, bit<19> m, bit<32> dstSwitchIp) {
+    action tre_flag_on(bit<20> b, bit<20> m, bit<32> dstSwitchIp) {
         meta.parser_metadata.enable_tre = TRUE;
         meta.custom_metadata.hash_base = b;
         meta.custom_metadata.hash_max = m;
@@ -464,7 +494,7 @@ control MyEgress(inout headers hdr,
     }
 
     //레지스터에서 값 읽어오기 -> 레지스터.read(임시 저장, 인덱스)
-    action restore_token(bit<4> idx, bit<32> t) {
+    action restore_token(bit<5> idx, bit<32> t) {
         hdr.u_chunk_token[idx].chunk.setValid();
         fingerprint_store.read(hdr.u_chunk_token[idx].chunk.chunk_payload, t);
         hdr.u_chunk_token[idx].token.setInvalid();
@@ -477,7 +507,7 @@ control MyEgress(inout headers hdr,
         is_hot_flow.apply();
         // meta.parser_metadata.enable_tre = TRUE;
         // meta.custom_metadata.hash_base = 0;
-        // meta.custom_metadata.hash_max = 524287;
+        // meta.custom_metadata.hash_max = 1048575;
         
         if (meta.parser_metadata.enable_tre == TRUE) { // at ingress switch
             initial_setup();
@@ -578,6 +608,96 @@ control MyEgress(inout headers hdr,
                     tokenization(9);
                 } else { // register is empty or hash collision
                     store_fingerprint(9); // overwrite
+                }
+            }
+
+            store_read(10);
+            if (hdr.u_chunk_token[10].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[10].chunk.chunk_payload) { // cache hit
+                    tokenization(10);
+                } else { // register is empty or hash collision
+                    store_fingerprint(10); // overwrite
+                }
+            }
+            
+            store_read(11);
+            if (hdr.u_chunk_token[11].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[11].chunk.chunk_payload) { // cache hit
+                    tokenization(11);
+                } else { // register is empty or hash collision
+                    store_fingerprint(11); // overwrite
+                }
+            }
+
+            store_read(12);
+            if (hdr.u_chunk_token[12].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[12].chunk.chunk_payload) { // cache hit
+                    tokenization(12);
+                } else { // register is empty or hash collision
+                    store_fingerprint(12); // overwrite
+                }
+            }
+
+            store_read(13);
+            if (hdr.u_chunk_token[13].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[13].chunk.chunk_payload) { // cache hit
+                    tokenization(13);
+                } else { // register is empty or hash collision
+                    store_fingerprint(13); // overwrite
+                }
+            }
+
+            store_read(14);
+            if (hdr.u_chunk_token[14].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[14].chunk.chunk_payload) { // cache hit
+                    tokenization(14);
+                } else { // register is empty or hash collision
+                    store_fingerprint(14); // overwrite
+                }
+            }
+
+            store_read(15);
+            if (hdr.u_chunk_token[15].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[15].chunk.chunk_payload) { // cache hit
+                    tokenization(15);
+                } else { // register is empty or hash collision
+                    store_fingerprint(15); // overwrite
+                }
+            }
+
+            store_read(16);
+            if (hdr.u_chunk_token[16].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[16].chunk.chunk_payload) { // cache hit
+                    tokenization(16);
+                } else { // register is empty or hash collision
+                    store_fingerprint(16); // overwrite
+                }
+            }
+
+            store_read(17);
+            if (hdr.u_chunk_token[17].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[17].chunk.chunk_payload) { // cache hit
+                    tokenization(17);
+                } else { // register is empty or hash collision
+                    store_fingerprint(17); // overwrite
+                }
+            }
+
+            store_read(18);
+            if (hdr.u_chunk_token[18].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[18].chunk.chunk_payload) { // cache hit
+                    tokenization(18);
+                } else { // register is empty or hash collision
+                    store_fingerprint(18); // overwrite
+                }
+            }
+
+            store_read(19);
+            if (hdr.u_chunk_token[19].chunk.isValid()) {
+                if(tmp_finger_value == hdr.u_chunk_token[19].chunk.chunk_payload) { // cache hit
+                    tokenization(19);
+                } else { // register is empty or hash collision
+                    store_fingerprint(19); // overwrite
                 }
             }
 

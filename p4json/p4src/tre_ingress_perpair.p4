@@ -11,6 +11,8 @@
 #define FALSE 0 
 #define SHIM_TCP 77
 #define SHIM_UDP 78
+//#define SWITCH_ID 1
+
 
 header ethernet_t {
     bit<48> dstAddr;
@@ -56,7 +58,8 @@ header udp_t {
 
 header tre_bitmap_t {
     bit<10> bitmap;
-    bit<32> dstSwitchIp;
+    bit<16> srcSwitchID;
+    bit<16> dstSwitchID;
     bit<4> bitmapsize;
     bit<2> reserved;
 }
@@ -110,8 +113,10 @@ struct custom_metadata_t {
     bit<32> test_32;
     bit<256> test_256;
 
-    bit<19> hash_base;
-    bit<19> hash_max;
+    bit<20> hash_base;
+    bit<20> hash_max;
+    bit<16> pair_src_ID;
+    bit<16> pair_dst_ID;
 }
 
 struct metadata {
@@ -258,7 +263,6 @@ control MyIngress(inout headers hdr,
     register<bit<1>>(FLOW_REGISTER_SIZE) bloom_filter;
 
     apply {
- 
         /* ----------------------- find hot flow ----------------------- */
         bit<16> register_idx;
         bit<10> tmp = 0;
@@ -320,7 +324,7 @@ control MyIngress(inout headers hdr,
                 bloom_filter.write((bit<32>)bf2_idx, 1);
             }
         }
-        
+
         if (hdr.ipv4.isValid() && hdr.ipv4.ttl > 0) {
             ipv4_forwarding.apply();
         }
@@ -340,18 +344,15 @@ control MyEgress(inout headers hdr,
         
     //IMPLEMENTATION: FIXED Chunking / Fingerprinting and FIXED MATCHING
 
-    //#define HASH_BASE 16w0
-    //#define HASH_MAX  16w65535
+    #define HASH_BASE_1 20w0
+    #define HASH_MAX_1  20w524287
 
-    //#define HASH_BASE 16w0
-    //#define HASH_MAX  16w65535
-
-    #define HASH_BASE 19w0
-    #define HASH_MAX  19w524287
+    #define HASH_BASE_2 20w524288
+    #define HASH_MAX_2  20w1048575
 
     // #define HASH_BASE 20w0
     // #define HASH_MAX  20w1048575
-    #define ENTRY_SIZE 524288
+    #define ENTRY_SIZE 1048576
   
     bit<256> tmp_finger_value;
     bit<64> tmp_count;
@@ -374,6 +375,8 @@ control MyEgress(inout headers hdr,
         meta.custom_metadata.meta_count = 0;
         meta.custom_metadata.meta_bitmap = 0;
         hdr.tre_bitmap.setValid();
+        hdr.tre_bitmap.dstSwitchID = meta.custom_metadata.pair_dst_ID;
+        hdr.tre_bitmap.srcSwitchID = meta.custom_metadata.pair_src_ID;
         hdr.finger[0].setValid();
         hdr.finger[1].setValid();
         hdr.finger[2].setValid();
@@ -399,7 +402,7 @@ control MyEgress(inout headers hdr,
         hdr.finger[9].setInvalid();
    }
 
-    action fingerprinting(bit<19> hash_base, bit<19> hash_max) {
+    action fingerprinting(bit<20> hash_base, bit<20> hash_max) {
         hash(hdr.finger[0].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[0].chunk}, hash_max); 
         hash(hdr.finger[1].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[1].chunk}, hash_max); 
         hash(hdr.finger[2].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[2].chunk}, hash_max); 
@@ -440,26 +443,38 @@ control MyEgress(inout headers hdr,
          hdr.tre_bitmap.reserved = 0;
     }
 
-    action tre_flag_on(bit<19> b, bit<19> m, bit<32> dstSwitchIp) {
+    action set_pair(bit<16> a, bit<16> b){
+        meta.custom_metadata.pair_src_ID = a;
+        meta.custom_metadata.pair_dst_ID = b;
+    }
+
+    table initiate {
+        key = {
+        }
+        actions = {
+            set_pair;
+            NoAction();
+        }
+        default_action = NoAction;
+    }
+
+    action tre_flag_on(bit<20> b, bit<20> m) {
         meta.parser_metadata.enable_tre = TRUE;
         meta.custom_metadata.hash_base = b;
         meta.custom_metadata.hash_max = m;
-        hdr.tre_bitmap.dstSwitchIp = dstSwitchIp;
+        
     }
 
-    table is_hot_flow {
+    table tre {
         key = {
-            hdr.ipv4.srcAddr: exact;
-            hdr.ipv4.dstAddr: exact;
-            hdr.ipv4.protocol: exact;
-            meta.parser_metadata.srcPort: exact;
-            meta.parser_metadata.dstPort: exact;
+            meta.custom_metadata.pair_src_ID: exact;
+            meta.custom_metadata.pair_dst_ID: exact;
+            
         }
         actions = {
             tre_flag_on;
             NoAction();
         }
-        size = 2048;
         default_action = NoAction;
     }
 
@@ -470,11 +485,12 @@ control MyEgress(inout headers hdr,
         hdr.u_chunk_token[idx].token.setInvalid();
     }
 
-    const bit<32> SWITCH_IP = 0x0A0A0001;
+    // const bit<32> SWITCH_IP = 0x0A0A0001;
 
     apply {
         meta.parser_metadata.enable_tre = FALSE;
-        is_hot_flow.apply();
+        initiate.apply();
+        tre.apply();
         // meta.parser_metadata.enable_tre = TRUE;
         // meta.custom_metadata.hash_base = 0;
         // meta.custom_metadata.hash_max = 524287;
@@ -586,7 +602,7 @@ control MyEgress(inout headers hdr,
             store_counter.write(0, tmp_store_count);
 
             bitmap_gen();
-            hdr.tre_bitmap.dstSwitchIp = SWITCH_IP;
+            
         }
         end_setup();
     }

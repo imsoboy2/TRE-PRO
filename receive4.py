@@ -48,7 +48,7 @@ def main():
     fname = a.fname
 
     # interface = 'veth0'
-    interface = 'veth3'
+    interface = 'veth15'
     ifaces = filter(lambda i: interface in i, os.listdir('/sys/class/net/'))
     iface = ifaces[0]
     print "sniffing on %s" % iface

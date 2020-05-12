@@ -7,10 +7,14 @@
 *************************************************************************/
 
 #define MAX_LEN 10 
+#define INGRESS 1
+#define EGRESS  0
 #define TRUE 1
 #define FALSE 0 
-#define SHIM_TCP 77
-#define SHIM_UDP 78
+#define null 0x0
+
+
+const bit<32> SWITCH_IP = 0x0A0A0001;
 
 header ethernet_t {
     bit<48> dstAddr;
@@ -81,9 +85,9 @@ header finger_t {
 struct headers {
     ethernet_t ethernet;
     ipv4_t     ipv4;
+    tre_bitmap_t tre_bitmap;
     tcp_t      tcp;
     udp_t      udp; 
-    tre_bitmap_t tre_bitmap;
     u_chunk_token[MAX_LEN] u_chunk_token;
     finger_t[MAX_LEN] finger;
 }
@@ -100,7 +104,6 @@ struct custom_metadata_t {
     bit<5> meta_count;
     bit<10> meta_bitmap;
     bit<1> meta_remainder;
-    bit<10> mb;
 
     bit<32>  fingerprint;
     bit<256> value;
@@ -129,12 +132,12 @@ parser MyParser(packet_in packet,
                 inout metadata meta,
                 inout standard_metadata_t standard_metadata) {
     
-    state start { //default tre 
-        meta.parser_metadata.enable_tre = FALSE;
+    state start { 
         meta.parser_metadata.remaining = MAX_LEN;
         transition parse_ethernet;
-       
+        
     }
+
     state parse_ethernet {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
@@ -145,39 +148,79 @@ parser MyParser(packet_in packet,
 
 #define IPV4_PROTOCOL_TCP 6
 #define IPV4_PROTOCOL_UDP 17
+#define SHIM_TCP 77
+#define SHIM_UDP 78
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
         transition select(hdr.ipv4.protocol) {
             IPV4_PROTOCOL_TCP : parse_tcp;
-            IPV4_PROTOCOL_UDP : parse_udp;   
+            IPV4_PROTOCOL_UDP : parse_udp;
+            SHIM_TCP: parse_tcp;
+            SHIM_UDP: parse_udp;   
             default: accept;
         }
     }
-    
+
     state parse_tcp {
+        packet.extract(hdr.tcp);
         meta.parser_metadata.srcPort = hdr.tcp.srcPort; 
         meta.parser_metadata.dstPort = hdr.tcp.dstPort;
-        packet.extract(hdr.tcp);       
-        transition parse_all_chunk;
+        transition select(hdr.ipv4.protocol) {
+            SHIM_TCP: parse_tre_bitmap;
+            default: accept;
+        }
     }
      state parse_udp {
+        packet.extract(hdr.udp);
         meta.parser_metadata.srcPort = hdr.udp.srcPort;
         meta.parser_metadata.dstPort = hdr.udp.dstPort;
-        packet.extract(hdr.udp);
-        transition parse_all_chunk;
+        transition select(hdr.ipv4.protocol) {
+            SHIM_UDP: parse_tre_bitmap;
+            default: accept;
+        }
     }
 
-    /// ingress, all chunk, no token
-    state parse_all_chunk {
-        packet.extract(hdr.u_chunk_token.next.chunk);
+   ///////////////////hdr.tre_bitmap.bitmap enter reversed order
+   state parse_tre_bitmap {
+        packet.extract(hdr.tre_bitmap);
+        meta.custom_metadata.meta_bitmap = hdr.tre_bitmap.bitmap;
+
+        meta.parser_metadata.enable_tre = TRUE;
+        transition parse_tre_select;
+    }
+    
+    ///egress router, chunks, tokens mix
+    state parse_tre_select {
+        meta.custom_metadata.meta_remainder = (bit<1>)(meta.custom_metadata.meta_bitmap % 2);
+        meta.custom_metadata.meta_bitmap = meta.custom_metadata.meta_bitmap >> 1;
+        
+        transition select(meta.custom_metadata.meta_remainder) {
+            1 : parse_token;
+            0 : parse_chunk;
+        }
+    }
+
+    state parse_token {        
         meta.parser_metadata.remaining = meta.parser_metadata.remaining - 1;
+        packet.extract(hdr.u_chunk_token.next.token);         
+
+        transition select(meta.parser_metadata.remaining) {
+            0 : accept;
+            default : parse_tre_select;
+        }
+    }
+
+    state parse_chunk {
+        meta.parser_metadata.remaining = meta.parser_metadata.remaining - 1;
+        packet.extract(hdr.u_chunk_token.next.chunk);
         
         transition select(meta.parser_metadata.remaining) {
             0 : accept;
-            default : parse_all_chunk;
-        }
+            default : parse_tre_select;
+        }        
     }
+
 }
 
 /*************************************************************************
@@ -225,7 +268,7 @@ control MyIngress(inout headers hdr,
     }
     
     action set_egress() {
-        standard_metadata.egress_spec = 3;
+        standard_metadata.egress_spec = 1;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
@@ -251,14 +294,14 @@ control MyIngress(inout headers hdr,
     #define FLOW_HASH_MAX_2 16w49151
     #define FLOW_HASH_BASE_3 16w49152
     #define FLOW_HASH_MAX_3 16w65535
-    #define THRESHOLD 128
+    #define THRESHOLD 64
     #define CONTROLLER_PORT 10
 
     register<bit<10>>(FLOW_REGISTER_SIZE) hot_flow_counter;
     register<bit<1>>(FLOW_REGISTER_SIZE) bloom_filter;
 
     apply {
- 
+
         /* ----------------------- find hot flow ----------------------- */
         bit<16> register_idx;
         bit<10> tmp = 0;
@@ -351,93 +394,22 @@ control MyEgress(inout headers hdr,
 
     // #define HASH_BASE 20w0
     // #define HASH_MAX  20w1048575
-    #define ENTRY_SIZE 524288
+    #define ENTRY_SIZE 2097152 // 262144 * 8
   
     bit<256> tmp_finger_value;
     bit<64> tmp_count;
     bit<64> tmp_hash_collision_count; //hash_collision
     bit<64> tmp_read_count;
     bit<64> tmp_store_count;
+    bit<32> tmp_finger;
     
     register<bit<256>> (ENTRY_SIZE) fingerprint_store;
-    register<bit<64>> (1) token_counter;
-    register<bit<64>> (1) hash_collision_counter;
-    //hash_collision
-    register<bit<64>> (1) read_counter;
-    register<bit<64>> (1) store_counter;
 
     //register<bit<256>> (ENTRY_SIZE) left_store;
     //register<bit<256>> (ENTRY_SIZE) right_store;
 
-    // In case of Ingress router
-    action initial_setup(){
-        meta.custom_metadata.meta_count = 0;
-        meta.custom_metadata.meta_bitmap = 0;
-        hdr.tre_bitmap.setValid();
-        hdr.finger[0].setValid();
-        hdr.finger[1].setValid();
-        hdr.finger[2].setValid();
-        hdr.finger[3].setValid();
-        hdr.finger[4].setValid();
-        hdr.finger[5].setValid();
-        hdr.finger[6].setValid();
-        hdr.finger[7].setValid();
-        hdr.finger[8].setValid();
-        hdr.finger[9].setValid();
-    }
-
-    action end_setup(){
-        hdr.finger[0].setInvalid();
-        hdr.finger[1].setInvalid();
-        hdr.finger[2].setInvalid();
-        hdr.finger[3].setInvalid();
-        hdr.finger[4].setInvalid();
-        hdr.finger[5].setInvalid();
-        hdr.finger[6].setInvalid();
-        hdr.finger[7].setInvalid();
-        hdr.finger[8].setInvalid();
-        hdr.finger[9].setInvalid();
-   }
-
-    action fingerprinting(bit<19> hash_base, bit<19> hash_max) {
-        hash(hdr.finger[0].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[0].chunk}, hash_max); 
-        hash(hdr.finger[1].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[1].chunk}, hash_max); 
-        hash(hdr.finger[2].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[2].chunk}, hash_max); 
-        hash(hdr.finger[3].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[3].chunk}, hash_max); 
-        hash(hdr.finger[4].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[4].chunk}, hash_max); 
-        hash(hdr.finger[5].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[5].chunk}, hash_max); 
-        hash(hdr.finger[6].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[6].chunk}, hash_max); 
-        hash(hdr.finger[7].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[7].chunk}, hash_max); 
-        hash(hdr.finger[8].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[8].chunk}, hash_max); 
-        hash(hdr.finger[9].finger, HashAlgorithm.crc32, hash_base, {hdr.u_chunk_token[9].chunk}, hash_max); 
-    }
-
-    action store_read(bit<4> X) {
-        fingerprint_store.read(tmp_finger_value, hdr.finger[X].finger);
-        tmp_read_count = tmp_read_count + 1;
-    }
-
-    action store_fingerprint(bit<4> Y) {
-        fingerprint_store.write(hdr.finger[Y].finger, hdr.u_chunk_token[Y].chunk.chunk_payload);
-        tmp_store_count = tmp_store_count + 1;
-    }
-
-    action tokenization(bit<10> K) {
-        token_counter.read(meta.custom_metadata.token_counter,0);
-        meta.custom_metadata.token_counter = meta.custom_metadata.token_counter + 1;
-        token_counter.write(0, meta.custom_metadata.token_counter);
-        token_counter.read(tmp_count, 0);
-        meta.custom_metadata.meta_count = meta.custom_metadata.meta_count + 1;
-        meta.custom_metadata.mb = 1 << K;
-        meta.custom_metadata.meta_bitmap = meta.custom_metadata.meta_bitmap + meta.custom_metadata.mb ;
-        hdr.u_chunk_token[K].chunk.setInvalid();
-        hdr.u_chunk_token[K].token.setValid();
-        hdr.u_chunk_token[K].token.token_index = hdr.finger[K].finger;
-    }
-
-    action bitmap_gen(){
-         hdr.tre_bitmap.bitmap = meta.custom_metadata.meta_bitmap;   
-         hdr.tre_bitmap.reserved = 0;
+    action end_setup() {
+        hdr.tre_bitmap.setInvalid();
     }
 
     action tre_flag_on(bit<19> b, bit<19> m, bit<32> dstSwitchIp) {
@@ -470,7 +442,10 @@ control MyEgress(inout headers hdr,
         hdr.u_chunk_token[idx].token.setInvalid();
     }
 
-    const bit<32> SWITCH_IP = 0x0A0A0001;
+    action store_fingerprint(bit<4> Y) {
+        hash(tmp_finger, HashAlgorithm.crc32, meta.custom_metadata.hash_base, {hdr.u_chunk_token[Y].chunk}, meta.custom_metadata.hash_max); 
+        fingerprint_store.write(tmp_finger, hdr.u_chunk_token[Y].chunk.chunk_payload);
+    }
 
     apply {
         meta.parser_metadata.enable_tre = FALSE;
@@ -479,115 +454,71 @@ control MyEgress(inout headers hdr,
         // meta.custom_metadata.hash_base = 0;
         // meta.custom_metadata.hash_max = 524287;
         
-        if (meta.parser_metadata.enable_tre == TRUE) { // at ingress switch
-            initial_setup();
-            
-            if (hdr.ipv4.protocol == IPV4_PROTOCOL_TCP) { hdr.ipv4.protocol = SHIM_TCP; }
-            else if (hdr.ipv4.protocol == IPV4_PROTOCOL_UDP) { hdr.ipv4.protocol = SHIM_UDP; }
-
-            fingerprinting(meta.custom_metadata.hash_base, meta.custom_metadata.hash_max); 
-
-            hash_collision_counter.read(tmp_hash_collision_count, 0); // hash_collision
-            read_counter.read(tmp_read_count, 0);
-            store_counter.read(tmp_store_count, 0);
-       
-            store_read(0);
-            if (hdr.u_chunk_token[0].chunk.isValid()) {
-                if(tmp_finger_value == hdr.u_chunk_token[0].chunk.chunk_payload) { // cache hit
-                    tokenization(0);
-                } else { // register is empty or hash collision
-                    store_fingerprint(0); // overwrite
-                }
-            }
-            
-            store_read(1);
-            if (hdr.u_chunk_token[1].chunk.isValid()) {
-                if(tmp_finger_value == hdr.u_chunk_token[1].chunk.chunk_payload) { // cache hit
-                    tokenization(1);
-                } else { // register is empty or hash collision
-                    store_fingerprint(1); // overwrite
-                }
+        if(meta.parser_metadata.enable_tre == TRUE) { // at egress switch
+            if (hdr.tre_bitmap.bitmap[0:0] == 0x1) { // is token
+                restore_token(0, hdr.u_chunk_token[0].token.token_index);
+            } else if (hdr.u_chunk_token[0].chunk.isValid()){
+                store_fingerprint(0);
             }
 
-            store_read(2);
-            if (hdr.u_chunk_token[2].chunk.isValid()) {
-                if(tmp_finger_value == hdr.u_chunk_token[2].chunk.chunk_payload) { // cache hit
-                    tokenization(2);
-                } else { // register is empty or hash collision
-                    store_fingerprint(2); // overwrite
-                }
+            if (hdr.tre_bitmap.bitmap[1:1] == 0x1) { // is token
+                restore_token(1, hdr.u_chunk_token[1].token.token_index);
+            } else if (hdr.u_chunk_token[1].chunk.isValid()){
+                store_fingerprint(1);
             }
 
-            store_read(3);
-            if (hdr.u_chunk_token[3].chunk.isValid()) {
-                if(tmp_finger_value == hdr.u_chunk_token[3].chunk.chunk_payload) { // cache hit
-                    tokenization(3);
-                } else { // register is empty or hash collision
-                    store_fingerprint(3); // overwrite
-                }
+            if (hdr.tre_bitmap.bitmap[2:2] == 0x1) { // is token
+                restore_token(2, hdr.u_chunk_token[2].token.token_index);
+            } else if (hdr.u_chunk_token[2].chunk.isValid()){
+                store_fingerprint(2);
             }
 
-            store_read(4);
-            if (hdr.u_chunk_token[4].chunk.isValid()) {
-                if(tmp_finger_value == hdr.u_chunk_token[4].chunk.chunk_payload) { // cache hit
-                    tokenization(4);
-                } else { // register is empty or hash collision
-                    store_fingerprint(4); // overwrite
-                }
+            if (hdr.tre_bitmap.bitmap[3:3] == 0x1) { // is token
+                restore_token(3, hdr.u_chunk_token[3].token.token_index);
+            } else if (hdr.u_chunk_token[3].chunk.isValid()){
+                store_fingerprint(3);
             }
 
-            store_read(5);
-            if (hdr.u_chunk_token[5].chunk.isValid()) {
-                if(tmp_finger_value == hdr.u_chunk_token[5].chunk.chunk_payload) { // cache hit
-                    tokenization(5);
-                } else { // register is empty or hash collision
-                    store_fingerprint(5); // overwrite
-                }
+            if (hdr.tre_bitmap.bitmap[4:4] == 0x1) { // is token
+                restore_token(4, hdr.u_chunk_token[4].token.token_index);
+            } else if (hdr.u_chunk_token[4].chunk.isValid()){
+                store_fingerprint(4);
             }
 
-            store_read(6);
-            if (hdr.u_chunk_token[6].chunk.isValid()) {
-                if(tmp_finger_value == hdr.u_chunk_token[6].chunk.chunk_payload) { // cache hit
-                    tokenization(6);
-                } else { // register is empty or hash collision
-                    store_fingerprint(6); // overwrite
-                }
+            if (hdr.tre_bitmap.bitmap[5:5] == 0x1) { // is token
+                restore_token(5, hdr.u_chunk_token[5].token.token_index);
+            } else if (hdr.u_chunk_token[5].chunk.isValid()){
+                store_fingerprint(5);
             }
 
-            store_read(7);
-            if (hdr.u_chunk_token[7].chunk.isValid()) {
-                if(tmp_finger_value == hdr.u_chunk_token[7].chunk.chunk_payload) { // cache hit
-                    tokenization(7);
-                } else { // register is empty or hash collision
-                    store_fingerprint(7); // overwrite
-                }
+            if (hdr.tre_bitmap.bitmap[6:6] == 0x1) { // is token
+                restore_token(6, hdr.u_chunk_token[6].token.token_index);
+            } else if (hdr.u_chunk_token[6].chunk.isValid()){
+                store_fingerprint(6);
             }
 
-            store_read(8);
-            if (hdr.u_chunk_token[8].chunk.isValid()) {
-                if(tmp_finger_value == hdr.u_chunk_token[8].chunk.chunk_payload) { // cache hit
-                    tokenization(8);
-                } else { // register is empty or hash collision
-                    store_fingerprint(8); // overwrite
-                }
+            if (hdr.tre_bitmap.bitmap[7:7] == 0x1) { // is token
+                restore_token(7, hdr.u_chunk_token[7].token.token_index);
+            } else if (hdr.u_chunk_token[7].chunk.isValid()){
+                store_fingerprint(7);
             }
 
-            store_read(9);
-            if (hdr.u_chunk_token[9].chunk.isValid()) {
-                if(tmp_finger_value == hdr.u_chunk_token[9].chunk.chunk_payload) { // cache hit
-                    tokenization(9);
-                } else { // register is empty or hash collision
-                    store_fingerprint(9); // overwrite
-                }
+            if (hdr.tre_bitmap.bitmap[8:8] == 0x1) { // is token
+                restore_token(8, hdr.u_chunk_token[8].token.token_index);
+            } else if (hdr.u_chunk_token[8].chunk.isValid()){
+                store_fingerprint(8);
             }
 
-            hash_collision_counter.write(0, tmp_hash_collision_count); //hash_collision
-            read_counter.write(0, tmp_read_count);
-            store_counter.write(0, tmp_store_count);
+            if (hdr.tre_bitmap.bitmap[9:9] == 0x1) { // is token
+                restore_token(9, hdr.u_chunk_token[9].token.token_index);
+            } else if (hdr.u_chunk_token[9].chunk.isValid()){
+                store_fingerprint(9);
+            }
 
-            bitmap_gen();
-            hdr.tre_bitmap.dstSwitchIp = SWITCH_IP;
+            if (hdr.ipv4.protocol == SHIM_TCP) { hdr.ipv4.protocol = IPV4_PROTOCOL_TCP; }
+            else if (hdr.ipv4.protocol == SHIM_UDP) { hdr.ipv4.protocol = IPV4_PROTOCOL_UDP; }
         }
+        hdr.tre_bitmap.setInvalid();
         end_setup();
     }
 }
@@ -602,29 +533,17 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
         packet.emit(hdr.udp);
-        packet.emit(hdr.tcp);        
-        packet.emit(hdr.tre_bitmap);
+        packet.emit(hdr.tcp);
         packet.emit(hdr.u_chunk_token[0].chunk);
-        packet.emit(hdr.u_chunk_token[0].token);
         packet.emit(hdr.u_chunk_token[1].chunk);
-        packet.emit(hdr.u_chunk_token[1].token);
         packet.emit(hdr.u_chunk_token[2].chunk);
-        packet.emit(hdr.u_chunk_token[2].token);
         packet.emit(hdr.u_chunk_token[3].chunk);
-        packet.emit(hdr.u_chunk_token[3].token);
         packet.emit(hdr.u_chunk_token[4].chunk);
-        packet.emit(hdr.u_chunk_token[4].token);
         packet.emit(hdr.u_chunk_token[5].chunk);
-        packet.emit(hdr.u_chunk_token[5].token);
         packet.emit(hdr.u_chunk_token[6].chunk);
-        packet.emit(hdr.u_chunk_token[6].token);
         packet.emit(hdr.u_chunk_token[7].chunk);
-        packet.emit(hdr.u_chunk_token[7].token);
         packet.emit(hdr.u_chunk_token[8].chunk);
-        packet.emit(hdr.u_chunk_token[8].token);
         packet.emit(hdr.u_chunk_token[9].chunk);
-        packet.emit(hdr.u_chunk_token[9].token);
-
     }
 }
 

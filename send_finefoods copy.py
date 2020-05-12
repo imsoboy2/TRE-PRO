@@ -41,6 +41,7 @@ def main():
   global pktsum, NUM_OF_PAYLOAD, LOOP_CNT
 
   NUM_OF_PAYLOAD = int(a.pktnum)
+  # print 'num of payload = ', NUM_OF_PAYLOAD
 
   set_of_ip = []
   with open(a.dist + str(NUM_OF_PAYLOAD), 'r') as f:
@@ -49,41 +50,30 @@ def main():
       set_of_ip.append(line.strip())
       if not line: break
 	
-  set_of_ip.remove('')
   print(len(set_of_ip))
-  
   payload = ''
   ipcnt = 0
-
-  plist = []
-  flowcnt = []
-  with open("finefoods.txt", 'r') as f:
-    for i in range(100):
-      flowcnt.append(0)
+  with open("results/retransmission/sentpkt_" + a.fname, 'w') as f1:
+    for i in range(0, LOOP_CNT):
       cnt = 0
-      plist.append([])
-      for line in f:
-        if cnt >= 10: break
-        if line.strip():
-          payload += line
-        else:
-          pkt = make_packet('10.0.0.1', payload)
-          if len(pkt) > 1500:
+      with open("finefoods.txt", 'r') as f:
+        for line in f:
+          if cnt >= NUM_OF_PAYLOAD: break
+          if line.strip():
+            payload += line
+          else:
+            pkt = make_packet(set_of_ip[ipcnt], payload)
+            if len(pkt) > 1500:
+              payload = ''
+              continue
+            pktsum += len(pkt)
+            sendp(pkt, iface=dst_if, verbose=False)
+            # if ipcnt <= NUM_OF_PAYLOAD: f1.write(str(pkt[Raw]) + '\n')
             payload = ''
-            continue
-          plist[i].append(payload)
-          payload = ''
-          cnt += 1
-
-  for i in range(len(set_of_ip)):
-    idx = int(set_of_ip[i][8:])
-    idx = 2
-    payload = plist[idx][flowcnt[idx]]
-    pkt = make_packet(set_of_ip[idx], payload)
-    pktsum += len(pkt)
-    sendp(pkt, iface=dst_if, verbose=False)
-    flowcnt[idx] = (flowcnt[idx] + 1) % 10
-    ipcnt += 1
+            cnt += 1
+            ipcnt += 1
+            # print("--- cnt: ", ipcnt)
+            # print(pktsum) 
 
   with open("results/reduction/sentsum_" + a.fname, "w") as f:
     f.write("pktcnt = " + str(ipcnt) + "\n")

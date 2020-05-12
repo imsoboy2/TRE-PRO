@@ -181,10 +181,8 @@ def printGrpcError(e):
 
 def main(p4info_file_path1, bmv2_file_path1, p4info_file_path2, bmv2_file_path2):
     # Instantiate a P4Runtime helper from the p4info file
-    print "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaAAA"
     p4info_helper1 = p4runtime_lib.helper.P4InfoHelper(p4info_file_path1)
     p4info_helper2 = p4runtime_lib.helper.P4InfoHelper(p4info_file_path2)
-    print "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbBB"
 
     try:
         # Create a switch connection object for s1 and s2;

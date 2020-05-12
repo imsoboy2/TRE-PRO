@@ -56,7 +56,8 @@ header udp_t {
 
 header tre_bitmap_t {
     bit<10> bitmap;
-    bit<32> dstSwitchIp;
+    bit<16> srcSwitchIp;
+    bit<16> dstSwitchIp;
     bit<4> bitmapsize;
     bit<2> reserved;
 }

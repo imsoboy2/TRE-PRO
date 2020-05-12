@@ -351,7 +351,7 @@ control MyEgress(inout headers hdr,
 
     // #define HASH_BASE 20w0
     // #define HASH_MAX  20w1048575
-    #define ENTRY_SIZE 524288
+    #define ENTRY_SIZE 2097152
   
     bit<256> tmp_finger_value;
     bit<64> tmp_count;

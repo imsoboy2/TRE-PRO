@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-import argparse
-
 import sys
 import struct
 import os
@@ -14,23 +12,15 @@ from scapy.layers.inet import _IPOption_HDR
 
 IPV4_PROTOCOL_TCP = 6
 IPV4_PROTOCOL_UDP = 17
-SHIM_TCP = 77
-SHIM_UDP = 78
-
-num_of_entries = 524288
-num_of_buckets = 8
-bucket_size = num_of_entries / num_of_buckets
-
+bucket_size = 65536
 hash_base = 0
 hash_max = bucket_size - 1
-
+num_of_entries = 524288
 cnt = 0
 hot_flow_set = set()
 
-parser = argparse.ArgumentParser(description='tre controller')
-parser.add_argument('--bktnum', type=int, required=False, default=8, help='number of buckets')
-parser.add_argument('--cache', type=int, required=False, default=16, help='cache size (mb)')
-parser.add_argument('--chunk', type=int, required=False, default=32, help='chunk size (byte)')
+SHIM_TCP = 77
+SHIM_UDP = 78
 
 class custom_hdr(Packet):
     """Custom Header"""
@@ -44,8 +34,8 @@ class custom_hdr(Packet):
 bind_layers(IP, UDP, proto=SHIM_UDP)
 bind_layers(IP, TCP, proto=SHIM_TCP)
 
-# bind_layers(UDP, custom_hdr)
-# bind_layers(TCP, custom_hdr)
+bind_layers(UDP, custom_hdr)
+bind_layers(TCP, custom_hdr)
 
 def populate_hot_flow_rule(p):
     global hash_base, hash_max, cnt
@@ -58,8 +48,13 @@ def populate_hot_flow_rule(p):
 
     rule = "table_add is_hot_flow tre_flag_on %s %s %d %d %d => %d %d 0x0A0A0001" % (p["srcIP"], p["dstIP"], p["proto"], p["srcPort"], p["dstPort"], hash_base, hash_max)
     print rule
+    cmd = 'echo \"%s\" | /home/p4/behavioral-model/targets/simple_switch/sswitch_CLI --thrift-port 9091' % rule
+    os.system(cmd)
+
+    rule = "table_add is_hot_flow tre_flag_on %s %s %d %d %d => %d %d 0x0A0A0001" % (p["srcIP"], p["dstIP"], p["proto"], p["srcPort"], p["dstPort"], hash_base, hash_max)
+    print rule
     cmd = 'echo \"%s\" | /home/p4/behavioral-model/targets/simple_switch/sswitch_CLI --thrift-port 9090' % rule
-    # time.sleep(0.5)
+    time.sleep(0.5)
     os.system(cmd)
     hash_base += bucket_size
     hash_max += bucket_size
@@ -67,9 +62,8 @@ def populate_hot_flow_rule(p):
 
 pkt_5_tuple = {}
 def handle_pkt(pkt):
-    global pkt_5_tuple
-
-    pkt.show()
+    global empty, pkt_5_tuple
+    # pkt.show()
     # hexdump(pkt)
 
     pkt_5_tuple["srcIP"] = pkt[IP].src
@@ -82,23 +76,18 @@ def handle_pkt(pkt):
     elif pkt[IP].proto == IPV4_PROTOCOL_UDP:
         pkt_5_tuple["srcPort"] = pkt[UDP].sport
         pkt_5_tuple["dstPort"] = pkt[UDP].dport
+    elif pkt[IP].proto == SHIM_TCP:
+        pkt_5_tuple["srcPort"] = pkt[TCP].sport
+        pkt_5_tuple["dstPort"] = pkt[TCP].dport
+    elif pkt[IP].proto == SHIM_UDP:
+        pkt_5_tuple["srcPort"] = pkt[UDP].sport
+        pkt_5_tuple["dstPort"] = pkt[UDP].dport
 
     print pkt_5_tuple
     populate_hot_flow_rule(pkt_5_tuple)
 
 def main():
-    global num_of_entries, num_of_buckets, bucket_size, hash_max
-
-    a = parser.parse_args()
-    num_of_buckets = a.bktnum
-    num_of_entries = a.cache * 1048576 / a.chunk
-    bucket_size = num_of_entries / num_of_buckets
-    hash_max = bucket_size - 1
-    print 'num_of_buckets = ', a.bktnum
-    print 'num_of_entries = ', str(num_of_entries)
-    print 'bucket_size = ', str(bucket_size)
-    
-    ifaces = ['veth11']
+    ifaces = ['h3-eth0', 'h3-eth1']
     print "sniffing on %s" % ifaces
     sys.stdout.flush()
     sniff(iface = ifaces,
