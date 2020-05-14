@@ -8,3 +8,4 @@ finefoods2.txt
 finefoods3.txt
 results/
 logs/
+*_dist_*
