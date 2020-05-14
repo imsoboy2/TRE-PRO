@@ -3,9 +3,7 @@ Netre/p4runtime/pcaps/
 sentpkt
 recvpkt
 tmp
-finefoods.txt
-finefoods2.txt
-finefoods3.txt
+finefoods*.txt
 results/
 logs/
 *_dist_*
