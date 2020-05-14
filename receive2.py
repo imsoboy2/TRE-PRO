@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import argparse
 import sys
 import struct
 import os
@@ -12,6 +13,9 @@ from scapy.layers.inet import _IPOption_HDR
 IPV4_PROTOCOL_TCP = 6
 IPV4_PROTOCOL_UDP = 17
 
+parser = argparse.ArgumentParser(description='send packets')
+parser.add_argument('--fname', required=True, default='', help='name of saved file')
+
 # class custom_hdr(Packet):
 #     """Custom Header"""
 #     name = 'custom_hdr'
@@ -23,10 +27,10 @@ IPV4_PROTOCOL_UDP = 17
 # bind_layers(UDP, custom_hdr)
 
 sum = 0
-
+fname = ''
 def handle_pkt(pkt):
     # print(str(pkt[IP].src) + str(pkt[Raw]) + '\n')
-    with open("results/retransmission/recvpkt", 'a') as f1:
+    with open("results/retransmission/recvpkt_" + fname, 'a') as f1:
         # byte_array = map(ord, str(pkt[IP].src) + str(pkt[Raw]))
         if pkt[Raw]:
             f1.write(str(pkt[Raw]) + '\n')
@@ -37,6 +41,10 @@ def handle_pkt(pkt):
     hexdump(pkt)
 
 def main():
+    global fname
+    a = parser.parse_args()
+    fname = a.fname
+
     interface = 'veth5'
     ifaces = filter(lambda i: interface in i, os.listdir('/sys/class/net/'))
     iface = ifaces[0]

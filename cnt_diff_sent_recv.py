@@ -1,33 +1,30 @@
-f1 = open("results/retransmission/sentpkt_perpair1", "r")
+#!/usr/bin/env python
+import argparse
 
+parser = argparse.ArgumentParser(description='send packets')
+
+parser.add_argument('--innum', required=True, type=int, default='', help='name of saved file')
+parser.add_argument('--pktnum', required=True, type=int, default='', help='name of saved file')
+
+a = parser.parse_args()
 pset = set()
-payload = ''
-while True:
-    line = f1.readline()
-    if not line: break
-    if line.strip():
-        payload += line
-    else:
-        pset.add(payload)
-        payload = ''
+for i in range(1, a.innum + 1):
+    f1 = open("results/retransmission/sentpkt_in" + str(a.innum) + "_pktnum" + str(a.pktnum) + "_" + str(i), "r")
 
-f1.close()
-print(len(pset))
-f1 = open("results/retransmission/sentpkt_perpair2", "r")
+    payload = ''
+    while True:
+        line = f1.readline()
+        if not line: break
+        if line.strip():
+            payload += line
+        else:
+            pset.add(payload)
+            payload = ''
 
-payload = ''
-while True:
-    line = f1.readline()
-    if not line: break
-    if line.strip():
-        payload += line
-    else:
-        pset.add(payload)
-        payload = ''
+    f1.close()
+    print(len(pset))
 
-f1.close()
-
-f2 = open("results/retransmission/recvpkt", "r")
+f2 = open("results/retransmission/recvpkt_in" + str(a.innum) + "_pktnum" + str(a.pktnum), "r")
 diffcnt = 0
 samecnt = 0
 pktcnt = 0
@@ -44,11 +41,11 @@ while True:
         if payload in pset: 
             samecnt += 1
         else:
-            print '-----payload-----'
-            print(payload)
-            print '------------'
+            # print '-----payload-----'
+            # print(payload)
+            # print '------------'
             diffcnt += 1
-            print cnt, 'th pkt'
+            # print cnt, 'th pkt'
         cnt += 1
         pset2.add(payload)
         payload = ''

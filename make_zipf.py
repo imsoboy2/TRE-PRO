@@ -1,13 +1,13 @@
 import random
 import math
 
-num_query = 5000
-path_query = "z_dist3_" + str(num_query / 10)
-zipf = 0.99
+num_query = 100000
+path_query = "z80_dist_" + str(num_query / 10)
+zipf = 0.80
 
 len_key = 16
 len_val = 128
-max_key = 1000
+max_key = 4999
 
 #Zipf
 zeta = [0.0]
@@ -21,13 +21,12 @@ for i in range(1, num_query + 1):
     field[i] = k
 
 del field[0]
-# print str(field):
+print str(field)
 
 with open(path_query, 'w') as f:
   for i in range(0, num_query):
-    a = random.choice(field) + 2000
+    a = random.choice(field)
     num = "%04X" % a
-    print(num)
     f.write(num + '\n')
     # classC = int(num[0:2], 16)
     # classD = int(num[2:4], 16)

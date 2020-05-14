@@ -1,2 +1,1 @@
 table_add is_hot_flow tre_flag_on 1 1 => 0 1048575
-table_add is_hot_flow tre_flag_on 2 1 => 0 1048575

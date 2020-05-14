@@ -47,11 +47,8 @@ def main():
     a = parser.parse_args()
     fname = a.fname
 
-    # interface = 'veth0'
-    interface = 'veth15'
-    ifaces = filter(lambda i: interface in i, os.listdir('/sys/class/net/'))
-    iface = ifaces[0]
-    print "sniffing on %s" % iface
+    interface = ['veth3', 'veth9', 'veth13', 'veth15']
+    print "sniffing on %s" % interface
     sys.stdout.flush()
     sniff(iface = interface,
         prn = lambda x: handle_pkt(x))

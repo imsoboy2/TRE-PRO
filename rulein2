@@ -1,2 +1,2 @@
 table_add initiate set_pair => 2 1
-table_add tre tre_flag_on 2 1 => 0 1048575
+table_add tre tre_flag_on 2 1 => 524288 1048575
