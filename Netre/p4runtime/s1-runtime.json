@@ -1,5 +1,0 @@
-{
-  "target": "bmv2",
-  "p4info": "../build/tre_ingress.p4.p4info.txt",
-  "bmv2_json": "../build/tre_ingress.json"
-}
