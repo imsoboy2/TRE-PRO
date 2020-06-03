@@ -1,17 +1,10 @@
 # Introduction
-On-going work. 
-In this repository, i implemented a netre with standard P4 language and designed an experiment with BMv2 to show the efficiency of Netre.
 
-# What is Netre? 
+NETRE: a new in-network TRE architecture that leverages the power and flexibility of emerging programmable switches to provide on-path detection and elimination of redundant traffic transmission in the networks. In NETRE, a pair of nodes in a routing path cache packets to reduce bandwidth consumption and gain performance revenue. Each pair of cache nodes in the networks maintains per-pair synchronized cache stores to accurately encode and decode the on-the-fly traffics.
 
-Netre is a in-network traffic redundancy elimination scheme (TBD)
+We implement NETRE prototype in P4 language for BMv2 simple_switch target and Tofino TNA target.
 
-# Required software
 
+# How to run?
 (TBD)
 
-# Content
-
-(TBD)
-
-# How to run
