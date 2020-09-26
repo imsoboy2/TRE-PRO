@@ -1,0 +1,5 @@
+table_add table_tre_control tre_control 1 1 => 0 65535
+table_add ingress_forwarding set_egress 6 => 10
+table_add ingress_forwarding set_egress 7 => 10
+table_add ingress_forwarding set_egress 8 => 10
+table_add ingress_forwarding set_egress 9 => 10
