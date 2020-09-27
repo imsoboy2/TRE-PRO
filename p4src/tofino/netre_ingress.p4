@@ -19,6 +19,13 @@ const ip_protocol_t IP_PROTOCOLS_TCP = 6;
 const ip_protocol_t IP_PROTOCOLS_UDP = 17;
 const ip_protocol_t IP_PROTOCOLS_SHIM_TCP = 77;
 const ip_protocol_t IP_PROTOCOLS_SHIM_UDP = 78;
+typedef bit<32> chunk_size_1;
+typedef bit<8> chunk_size_2;
+typedef bit<40> chunk_size_3;
+typedef bit<16> token_size;
+
+
+
 
 header ethernet_h {
     bit<48>   dst_addr;
@@ -61,24 +68,18 @@ header udp_h {
     bit<16> checksum;
 }
 
-// header chunk_t {
-//     bit<32> chunk_payload;
-// }
-
-
-header chunk_1_t {
-    bit<32> chun1;
-    bit<32> chun2;
+header chunk_t {
+    chunk_size_1 chunk_1; //32
+    chunk_size_2 chunk_2;
+    chunk_size_1 chunk_3;
+    chunk_size_2 chunk_4; //8
 }
-header chunk_2_t {
-    bit<8> chun1;
-    bit<8> chun2;
-}
+
 header token_t {
-    bit<16> token_index;
+    token_size token_index; //16
 }
 
-header tre_bitmap_t {
+header tre_shim_t {
     bit<16> srcSwitchID;
     bit<16> dstSwitchID;
     bit<16> bitmap;
@@ -89,31 +90,27 @@ struct header_t {
     ipv4_h ipv4;
     tcp_h tcp;
     udp_h udp;
-    // tre_bitmap_t tre_bitmap;
-    // // chunk_t[MAX_LEN] chunk;
-    // chunk_1_t[MAX_LEN] chunks;
-    // chunk_2_t[MAX_LEN] chunks1;
-    // token_t[MAX_LEN] token;
 }
 
-struct parser_metadata_t {
-    bit<1> enable_tre;
-    bit<1> remaining;
+struct ig_tre_metadata_t {
+    bit<1> mark;
 }
 
 struct custom_metadata_t {
-    bit<16> idx;
-    bit<32> tmp;
-    bit<16> idx_1;
-    bit<32> tmp_1;
-    bit<16> idx_2;
-    bit<32> tmp_2;
-    bit<32> tmp_hyeim;
-    bit<8> tmp_yang;
-    bit<8> tmp_yang_test;
+    token_size idx;
+    chunk_size_1 tmp_size_1;
+    chunk_size_2 tmp_size_2;
+    chunk_size_1 value_sub_1;
+    chunk_size_2 value_sub_2;
+    chunk_size_1 val;
+    chunk_size_1 val2;
+    chunk_size_3 val3;
+
+
 }
 
 struct metadata_t {
+    ig_tre_metadata_t ig_tre;
 
 }
 
@@ -122,15 +119,12 @@ struct empty_header_t {
     ipv4_h ipv4;
     tcp_h tcp;
     udp_h udp;
-    tre_bitmap_t tre_bitmap;
-    // chunk_t[MAX_LEN] chunk;
-    chunk_1_t[MAX_LEN] chunks;
-    chunk_2_t[MAX_LEN] chunks1;
+    tre_shim_t tre_shim;
+    chunk_t[MAX_LEN] chunk;
     token_t[MAX_LEN] token;
 }
 
 struct empty_metadata_t {
-    parser_metadata_t parser_metadata;
     custom_metadata_t custom_metadata;
 }
 
@@ -147,10 +141,8 @@ parser SwitchIngressParser(
     state start {
         pkt.extract(ig_intr_md);
         pkt.advance(PORT_METADATA_SIZE);
-        // ig_md.parser_metadata.enable_tre = 0;
         transition parse_ethernet;
     }
-
     state parse_ethernet {
         pkt.extract(hdr.ethernet);
         transition select(hdr.ethernet.ether_type) {
@@ -158,7 +150,6 @@ parser SwitchIngressParser(
             default: accept;
         }
     }
-
     state parse_ipv4 {
         pkt.extract(hdr.ipv4);
         transition select(hdr.ipv4.protocol) {
@@ -167,22 +158,14 @@ parser SwitchIngressParser(
             default : accept;
         }
     }
-
     state parse_tcp {
         pkt.extract(hdr.tcp);
         transition accept;
     }
-
     state parse_udp {
         pkt.extract(hdr.udp);
         transition accept;
     }
-
-      // state parse_chunk7 {
-    //     pkt.extract(hdr.chunks[7]);
-    //     pkt.extract(hdr.chunks1[7]);
-    //     transition accept;
-    // }
 }
 
 // ---------------------------------------------------------------------------
@@ -206,40 +189,53 @@ control SwitchIngress(
         in ingress_intrinsic_metadata_from_parser_t ig_prsr_md,
         inout ingress_intrinsic_metadata_for_deparser_t ig_dprsr_md,
         inout ingress_intrinsic_metadata_for_tm_t ig_tm_md) {
- 
+
     action set_egress(bit<9> port) {
         ig_tm_md.ucast_egress_port = port;
-        ig_tm_md.bypass_egress = true;
+    }
+    action tre_enable() {
+        ig_tm_md.bypass_egress = 0;
+    }
+    action tre_bypass() {
+        ig_tm_md.bypass_egress = 1;
     }
 
-     action set_tre(bit<9> port) {
-        ig_tm_md.ucast_egress_port = port;
-    }
 
-    table switching_table {
+    table set_egress_table {
         key = {
             ig_intr_md.ingress_port: exact;
         }
         actions = {
             set_egress();
-            set_tre();
         }
         const entries = {
-            160 : set_tre(176);
-            184 : set_egress(172);
-            164 : set_egress(148);
-            156 : set_egress(132);
-            140 : set_egress(160);
+            172 : set_egress(173);
+        }
+    }
+
+    table set_config_table{
+        key = {
+            ig_md.ig_tre.mark: exact;
+        }
+        actions = {
+            tre_enable();
+            tre_bypass();
+        }
+        const entries = {
+            1 : tre_enable();
+            0 : tre_bypass();
         }
     }
 
     apply {
-        switching_table.apply();
+        ig_md.ig_tre.mark = 1; //set mark = 1, if you want to perform NETRE
+        if (hdr.ipv4.isValid()){
+            set_egress_table.apply();
+            set_config_table.apply();
+        }
     }
-  
 }
 
-// Empty egress parser/control blocks
 parser EmptyEgressParser(
         packet_in pkt,
         out empty_header_t hdr,
@@ -269,77 +265,66 @@ parser EmptyEgressParser(
 
     state parse_tcp {
         pkt.extract(hdr.tcp);
-        transition parse_chunk0;
+        transition parse_chunk_0;
     }
 
     state parse_udp {
         pkt.extract(hdr.udp);
-        transition parse_chunk0;
+        transition parse_chunk_0;
     }
 
-    state parse_chunk0 {
-        pkt.extract(hdr.chunks[0]);
-        pkt.extract(hdr.chunks1[0]);
-        transition parse_chunk1;
+    state parse_chunk_0 {
+        pkt.extract(hdr.chunk[0]);
+        transition parse_chunk_1;
     }
 
-    state parse_chunk1 {
-        pkt.extract(hdr.chunks[1]);
-        pkt.extract(hdr.chunks1[1]);
-        transition parse_chunk2;
+    state parse_chunk_1 {
+        pkt.extract(hdr.chunk[1]);
+        transition parse_chunk_2;
     }
 
-    state parse_chunk2 {
-        pkt.extract(hdr.chunks[2]);
-        pkt.extract(hdr.chunks1[2]);
-        transition parse_chunk3;
+    state parse_chunk_2 {
+        pkt.extract(hdr.chunk[2]);
+        transition parse_chunk_3;
     }
 
-    state parse_chunk3 {
-        pkt.extract(hdr.chunks[3]);
-        pkt.extract(hdr.chunks1[3]);
-        transition parse_chunk4;
+    state parse_chunk_3 {
+        pkt.extract(hdr.chunk[3]);
+        transition parse_chunk_4;
     }
 
-    state parse_chunk4 {
-        pkt.extract(hdr.chunks[4]);
-        pkt.extract(hdr.chunks1[4]);
-        transition parse_chunk5;
+    state parse_chunk_4 {
+        pkt.extract(hdr.chunk[4]);
+        transition parse_chunk_5;
     }
 
-    state parse_chunk5 {
-        pkt.extract(hdr.chunks[5]);
-        pkt.extract(hdr.chunks1[5]);
-        transition parse_chunk6;
+    state parse_chunk_5 {
+        pkt.extract(hdr.chunk[5]);
+        transition parse_chunk_6;
     }
 
-    state parse_chunk6 {
-        pkt.extract(hdr.chunks[6]);
-        pkt.extract(hdr.chunks1[6]);
-        transition parse_chunk7;
+    state parse_chunk_6 {
+        pkt.extract(hdr.chunk[6]);
+        transition parse_chunk_7;
     }
 
-    state parse_chunk7 {
-        pkt.extract(hdr.chunks[7]);
-        pkt.extract(hdr.chunks1[7]);
-        transition parse_chunk8;
+    state parse_chunk_7 {
+        pkt.extract(hdr.chunk[7]);
+        transition parse_chunk_8;
     }
 
-    state parse_chunk8 {
-        pkt.extract(hdr.chunks[8]);
-        pkt.extract(hdr.chunks1[8]);
-        transition parse_chunk9;
+    state parse_chunk_8 {
+        pkt.extract(hdr.chunk[8]);
+        transition parse_chunk_9;
     }
 
-    state parse_chunk9 {
-        pkt.extract(hdr.chunks[9]);
-        pkt.extract(hdr.chunks1[9]);
-        transition parse_chunk10;
+    state parse_chunk_9 {
+        pkt.extract(hdr.chunk[9]);
+        transition parse_chunk_10;
     }
 
-    state parse_chunk10 {
-        pkt.extract(hdr.chunks[10]);
-        pkt.extract(hdr.chunks1[10]);
+    state parse_chunk_10 {
+        pkt.extract(hdr.chunk[10]);
         transition accept;
     }
 
@@ -355,28 +340,28 @@ control EmptyEgressDeparser(
         pkt.emit(hdr.ipv4);
         pkt.emit(hdr.tcp);
         pkt.emit(hdr.udp);
-        pkt.emit(hdr.tre_bitmap);
-        pkt.emit(hdr.chunks[0]);
+        pkt.emit(hdr.tre_shim);
+        pkt.emit(hdr.chunk[0]);
         pkt.emit(hdr.token[0]);
-        pkt.emit(hdr.chunks[1]);
+        pkt.emit(hdr.chunk[1]);
         pkt.emit(hdr.token[1]);
-        pkt.emit(hdr.chunks[2]);
+        pkt.emit(hdr.chunk[2]);
         pkt.emit(hdr.token[2]);
-        pkt.emit(hdr.chunks[3]);
+        pkt.emit(hdr.chunk[3]);
         pkt.emit(hdr.token[3]);
-        pkt.emit(hdr.chunks[4]);
+        pkt.emit(hdr.chunk[4]);
         pkt.emit(hdr.token[4]);
-        pkt.emit(hdr.chunks[5]);
+        pkt.emit(hdr.chunk[5]);
         pkt.emit(hdr.token[5]);
-        pkt.emit(hdr.chunks[6]);
+        pkt.emit(hdr.chunk[6]);
         pkt.emit(hdr.token[6]);
-        pkt.emit(hdr.chunks[7]);
+        pkt.emit(hdr.chunk[7]);
         pkt.emit(hdr.token[7]);
-        pkt.emit(hdr.chunks[8]);
+        pkt.emit(hdr.chunk[8]);
         pkt.emit(hdr.token[8]);
-        pkt.emit(hdr.chunks[9]);
+        pkt.emit(hdr.chunk[9]);
         pkt.emit(hdr.token[9]);
-        pkt.emit(hdr.chunks[10]);
+        pkt.emit(hdr.chunk[10]);
         pkt.emit(hdr.token[10]);
     }
 }
@@ -389,67 +374,65 @@ control EmptyEgress(
         inout egress_intrinsic_metadata_for_deparser_t ig_intr_dprs_md,
         inout egress_intrinsic_metadata_for_output_port_t eg_intr_oport_md) {
 
-
-     #define CHUNK_HASH_FIELDS(i) { \
-        hdr.chunks[##i##].chun1, \
-        hdr.chunks[##i##].chun2, \
-        hdr.chunks1[##i##].chun1, \
-        hdr.chunks1[##i##].chun2 \
+    #define CHUNK_HASH_FIELDS(i) { \
+        hdr.chunk[##i##].chunk_1, \
+        hdr.chunk[##i##].chunk_2, \
+        hdr.chunk[##i##].chunk_3, \
+        hdr.chunk[##i##].chunk_4 \
     }
 
     #define TEST_REG(i) \
         Hash<bit<16>> (HashAlgorithm_t.CRC16) hash##i; \
-        Register<bit<32>, bit<32>>(32w65536) test_reg##i; \
-        RegisterAction<bit<32>, bit<32>, bit<32>>(test_reg##i) test_reg_action##i = { \
-            void apply(inout bit<32> value, out bit<32> read_value){ \
+        Register<chunk_size_1, bit<32>>(32w65536) register_##i##_part_1; \
+        RegisterAction<chunk_size_1, bit<32>, chunk_size_1>(register_##i##_part_1) reg_##i##_part_1_action = { \
+            void apply(inout chunk_size_1 value, out chunk_size_1 read_value){ \
                 read_value = value; \
-                if (read_value != hdr.chunks[##i##].chun1 || read_value == 0) { \
-                    value = hdr.chunks[##i##].chun1; \
+                if (read_value != hdr.chunk[##i##].chunk_1 || read_value == 0) { \
+                    value = hdr.chunk[##i##].chunk_1; \
                     } \
             } \
         }; \
-        Register<bit<32>, bit<32>>(32w65536) test_reg_1##i; \
-        RegisterAction<bit<32>, bit<32>, bit<32>>(test_reg_1##i) test_reg_1_action##i = { \
-            void apply(inout bit<32> value, out bit<32> read_value){ \
+        Register<chunk_size_2, bit<32>>(32w65536) register_##i##_part_2; \
+        RegisterAction<chunk_size_2, bit<32>, chunk_size_2>(register_##i##_part_2) reg_##i##_part_2_action = { \
+            void apply(inout chunk_size_2 value, out chunk_size_2 read_value){ \
                 read_value = value; \
-                if (read_value != hdr.chunks[##i##].chun2 || read_value == 0) { \
-                    value = hdr.chunks[##i##].chun2; \
+                if (read_value != hdr.chunk[##i##].chunk_2 || read_value == 0) { \
+                    value = hdr.chunk[##i##].chunk_2; \
                     } \
             } \
         }; \
-           Register<bit<8>, bit<32>>(32w65536) test_reg_2##i; \
-        RegisterAction<bit<8>, bit<32>, bit<8>>(test_reg_2##i) test_reg_2_action##i = { \
-            void apply(inout bit<8> value, out bit<8> read_value){ \
+        Register<chunk_size_1, bit<32>>(32w65536) register_##i##_part_3; \
+        RegisterAction<chunk_size_1, bit<32>, chunk_size_1>(register_##i##_part_3) reg_##i##_part_3_action = { \
+            void apply(inout chunk_size_1 value, out chunk_size_1 read_value){ \
                 read_value = value; \
-                if (read_value != hdr.chunks1[##i##].chun1 || read_value == 0) { \
-                    value = hdr.chunks1[##i##].chun1; \
+                if (read_value != hdr.chunk[##i##].chunk_3 || read_value == 0) { \
+                    value = hdr.chunk[##i##].chunk_3; \
                     } \
             } \
         }; \
-        Register<bit<8>, bit<32>>(32w65536) test_reg_3##i; \
-        RegisterAction<bit<8>, bit<32>, bit<8>>(test_reg_3##i) test_reg_3_action##i = { \
-            void apply(inout bit<8> value, out bit<8> read_value){ \
+        Register<chunk_size_2, bit<32>>(32w65536) register_##i##_part_4; \
+        RegisterAction<chunk_size_2, bit<32>, chunk_size_2>(register_##i##_part_4) reg_##i##_part_4_action = { \
+            void apply(inout chunk_size_2 value, out chunk_size_2 read_value){ \
                 read_value = value; \
-                if (read_value != hdr.chunks1[##i##].chun2 || read_value == 0) { \
-                    value = hdr.chunks1[##i##].chun2; \
+                if (read_value != hdr.chunk[##i##].chunk_4 || read_value == 0) { \
+                    value = hdr.chunk[##i##].chunk_4; \
                     } \
             } \
         }; \
         action register_action##i() { \
              eg_md.custom_metadata.idx = hash##i.get(CHUNK_HASH_FIELDS(##i##)); \
-             eg_md.custom_metadata.tmp = test_reg_action##i.execute((bit<32>)eg_md.custom_metadata.idx); \
-             eg_md.custom_metadata.tmp_hyeim = eg_md.custom_metadata.tmp - hdr.chunks[##i##].chun1;\
+             eg_md.custom_metadata.tmp_size_1 = reg_##i##_part_1_action.execute((bit<32>)eg_md.custom_metadata.idx); \
+             eg_md.custom_metadata.value_sub_1 = eg_md.custom_metadata.tmp_size_1 - hdr.chunk[##i##].chunk_1;\
         }\
         action register_action_1_##i() {\
-             eg_md.custom_metadata.tmp_1 = test_reg_1_action##i.execute((bit<32>)eg_md.custom_metadata.idx); \
-             } \
+             reg_##i##_part_2_action.execute((bit<32>)eg_md.custom_metadata.idx); \
+        } \
         action register_action_2_##i() {\
-             eg_md.custom_metadata.tmp_yang = test_reg_2_action##i.execute((bit<32>)eg_md.custom_metadata.idx); \
-             eg_md.custom_metadata.tmp_yang_test = eg_md.custom_metadata.tmp_yang - hdr.chunks1[##i##].chun1; \
+             reg_##i##_part_3_action.execute((bit<32>)eg_md.custom_metadata.idx); \
         } \
         action register_action_3_##i() {\
-             test_reg_3_action##i.execute((bit<32>)eg_md.custom_metadata.idx); \
-        }  
+             eg_md.custom_metadata.tmp_size_2 = reg_##i##_part_4_action.execute((bit<32>)eg_md.custom_metadata.idx); \
+        }
 
     TEST_REG(0)
     TEST_REG(1)
@@ -463,14 +446,48 @@ control EmptyEgress(
     TEST_REG(9)
     TEST_REG(10)
 
-    action initial_setup() {
-        hdr.tre_bitmap.setValid();
-        hdr.tre_bitmap.bitmap = 0;
-        hdr.tre_bitmap.srcSwitchID = 0;
-        hdr.tre_bitmap.dstSwitchID = 0;
 
-        // ig_tm_md.ucast_egress_port = 1;
-        // ig_tm_md.bypass_egress = true;
+
+    #define CACHE_CHECK(i, j) \
+        action cache_hit##i##(bit<4> idx, bit<16> value) { \
+            hdr.tre_shim.bitmap = hdr.tre_shim.bitmap + value; \
+            hdr.token[##i##].token_index = eg_md.custom_metadata.idx; \
+            hdr.chunk[##i##].setInvalid(); \
+        } \
+        action cache_miss##i##(bit<4> idx) { \
+            hdr.token[##i##].setInvalid(); \
+        } \
+        table cache_check_##i { \
+            key = { \
+                eg_md.custom_metadata.value_sub_1: exact; \
+            } \
+            actions = { \
+                cache_hit##i##(); \
+                cache_miss##i##(); \
+            } \
+            default_action = cache_miss##i##(##i##); \
+            const entries = { \
+                (0) : cache_hit##i##(##i##, ##j##); \
+            } \
+        }
+
+    CACHE_CHECK(0, 1)
+    CACHE_CHECK(1, 2)
+    CACHE_CHECK(2, 4)
+    CACHE_CHECK(3, 8)
+    CACHE_CHECK(4, 16)
+    CACHE_CHECK(5, 32)
+    CACHE_CHECK(6, 64)
+    CACHE_CHECK(7, 128)
+    CACHE_CHECK(8, 256)
+    CACHE_CHECK(9, 512)
+    CACHE_CHECK(10, 1024)
+
+    action initial_setup() {
+        hdr.tre_shim.setValid();
+        hdr.tre_shim.bitmap = 0;
+        hdr.tre_shim.srcSwitchID = 0;
+        hdr.tre_shim.dstSwitchID = 0;
 
         hdr.token[0].setValid();
         hdr.token[1].setValid();
@@ -488,164 +505,72 @@ control EmptyEgress(
     apply {
         initial_setup();
 
-        
         register_action0();
         register_action_1_0();
         register_action_2_0();
         register_action_3_0();
-        if ( eg_md.custom_metadata.tmp_hyeim == 0 && eg_md.custom_metadata.tmp_yang_test == 0){ // HIT
-            hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 1; 
-            hdr.token[0].token_index = eg_md.custom_metadata.idx;
-            hdr.chunks[0].setInvalid();
-        } else {
-            hdr.token[0].setInvalid();
-        }
-        
+        cache_check_0.apply();
 
-        
         register_action1();
         register_action_1_1();
         register_action_2_1();
         register_action_3_1();
-        if ( eg_md.custom_metadata.tmp == hdr.chunks[1].chun1){
-           hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 2;
-           hdr.token[1].token_index = eg_md.custom_metadata.idx;
-           hdr.chunks[1].setInvalid();
-        } else {
-            hdr.token[1].setInvalid();
-        }
-        
+        cache_check_1.apply();
 
-        
         register_action2();
         register_action_1_2();
         register_action_2_2();
         register_action_3_2();
-        if ( eg_md.custom_metadata.tmp == hdr.chunks[2].chun1){
-           hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 4;
-           hdr.token[2].token_index = eg_md.custom_metadata.idx;
-           hdr.chunks[2].setInvalid();
-        } else {
-            hdr.token[2].setInvalid();
-        } 
-        
+        cache_check_2.apply();
 
-        
         register_action3();
         register_action_1_3();
         register_action_2_3();
         register_action_3_3();
-        if ( eg_md.custom_metadata.tmp == hdr.chunks[3].chun1){
-           hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 8;
-           hdr.token[3].token_index = eg_md.custom_metadata.idx;
-           hdr.chunks[3].setInvalid();
-        } else {
-            hdr.token[3].setInvalid();
-        }
-        
+        cache_check_3.apply();
 
-        
         register_action4();
         register_action_1_4();
         register_action_2_4();
         register_action_3_4();
-        if ( eg_md.custom_metadata.tmp == hdr.chunks[4].chun1){
-           hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 16;
-           hdr.token[4].token_index = eg_md.custom_metadata.idx;
-           hdr.chunks[4].setInvalid();
-        } else {
-            hdr.token[4].setInvalid();
-        }
-        
+        cache_check_4.apply();
 
-        
         register_action5();
         register_action_1_5();
         register_action_2_5();
         register_action_3_5();
-        if ( eg_md.custom_metadata.tmp == hdr.chunks[5].chun1){
-           hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 32;
-           hdr.token[5].token_index = eg_md.custom_metadata.idx;
-           hdr.chunks[5].setInvalid();
-        } else {
-            hdr.token[5].setInvalid();
-        }
-        
+        cache_check_5.apply();
 
-        
         register_action6();
         register_action_1_6();
         register_action_2_6();
         register_action_3_6();
-        if ( eg_md.custom_metadata.tmp == hdr.chunks[6].chun1){
-           hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 64;
-           hdr.token[6].token_index = eg_md.custom_metadata.idx;
-           hdr.chunks[6].setInvalid();
-        } else {
-            hdr.token[6].setInvalid();
-        }
-        
+        cache_check_6.apply();
 
-        
         register_action7();
         register_action_1_7();
         register_action_2_7();
         register_action_3_7();
-        if ( eg_md.custom_metadata.tmp == hdr.chunks[7].chun1){
-           hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 128;
-           hdr.token[7].token_index = eg_md.custom_metadata.idx;
-           hdr.chunks[7].setInvalid();
-        } else {
-            hdr.token[7].setInvalid();
-        }
-        
+        cache_check_7.apply();
 
-        
         register_action8();
         register_action_1_8();
         register_action_2_8();
         register_action_3_8();
-        if ( eg_md.custom_metadata.tmp == hdr.chunks[8].chun1){
-           hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 128;
-           hdr.token[8].token_index = eg_md.custom_metadata.idx;
-           hdr.chunks[8].setInvalid();
-        } else {
-            hdr.token[8].setInvalid();
-        }
-        
-        
+        cache_check_8.apply();
 
-        // register_action9();
-        // register_action_1_9();
-        // register_action_2_9();
-        // register_action_3_9();
-        // if ( ig_md.custom_metadata.tmp_1 == hdr.chunks[9].chun1){
-        //    //hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 128;
-        //    hdr.token[9].token_index = ig_md.custom_metadata.idx;
-        //    hdr.chunks[9].setInvalid();
-        // } else {
-        //     hdr.token[9].setInvalid();
-        // }
+        register_action9();
+        register_action_1_9();
+        register_action_2_9();
+        register_action_3_9();
+        cache_check_9.apply();
 
-        // register_action10();
-        // register_action_1_10();
-        // register_action_2_10();
-        // register_action_3_10();
-        // if ( ig_md.custom_metadata.tmp_1 == hdr.chunks[10].chun1){
-        //    //hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 128;
-        //    hdr.token[10].token_index = ig_md.custom_metadata.idx;
-        //    hdr.chunks[10].setInvalid();
-        // } else {
-        //     hdr.token[10].setInvalid();
-        // }
-        // register_action8();
-        // if ( ig_md.custom_metadata.tmp_2 == hdr.chunk[8].chunk_payload){
-        //    //hdr.tre_bitmap.bitmap = hdr.tre_bitmap.bitmap + 128;
-        //    hdr.token[8].token_index = ig_md.custom_metadata.idx_2;
-        //    hdr.chunk[8].setInvalid();
-        // } else {
-        //     hdr.token[8].setInvalid();
-        // }
+        register_action10();
+        register_action_1_10();
+        register_action_2_10();
+        register_action_3_10();
+        cache_check_10.apply();
+
     }
 }
 
