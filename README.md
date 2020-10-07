@@ -10,14 +10,15 @@ We implement NETRE prototype in P4 language for BMv2 simple_switch target and To
 ## Testbed setup
 
 1. Download dataset
-
+    ```bash
     wget http://snap.stanford.edu/data/finefoods.txt.gz
     gzip -d finefoods.txt.gz
+    ```
 
 2. Create files for test and compile codes
-
+    ```bash
     ./setup.sh
-
+    ```
 
 
 ## Run test script
@@ -25,8 +26,9 @@ We implement NETRE prototype in P4 language for BMv2 simple_switch target and To
 ### Reduction ratio
 
 To run test, simply do:
-
+    ```bash
 	./run_tests.sh
+    ```
 
 This script generates packets according to a  Zipf distribution with different skewed parameters(0.4 - 0.8) and calculates reduction ratio.
 
@@ -34,5 +36,6 @@ This script generates packets according to a  Zipf distribution with different s
 ### Clean up the test
 
 To delete all build files, and logs:
-
+    ```bash
     ./clear.sh
+    ```
