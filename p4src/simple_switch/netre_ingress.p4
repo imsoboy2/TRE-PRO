@@ -89,10 +89,10 @@ header tre_shim_t {
 }
 
 header chunk_t {
-    bit<32> chunk_payload_1;
-    bit<32> chunk_payload_2;
-    bit<8> chunk_payload_3;
-    bit<8> chunk_payload_4;
+    chunk1_size_t chunk_payload_1;
+    chunk2_size_t chunk_payload_2;
+    chunk1_size_t chunk_payload_3;
+    chunk2_size_t chunk_payload_4;
 }
 
 header token_t {
@@ -133,8 +133,8 @@ struct custom_metadata_t {
     bit<20> hash_max;
     bit<16> pair_src_ID;
     bit<16> pair_dst_ID;
-    bit<32> value_diff1;
-    bit<8> value_diff2;
+    chunk1_size_t value_diff1;
+    chunk2_size_t value_diff2;
 }
 
 struct metadata {
@@ -319,7 +319,7 @@ control MyIngress(inout headers hdr,
 
             if (bf0 == 0 || bf2 == 0 || bf2 == 0) {
                 // report flow to controller
-                // clone(CloneType.I2E, CONTROLLER_PORT);
+                clone(CloneType.I2E, CONTROLLER_PORT);
                 // -------------------------
                 bloom_filter.write((bit<32>)bf0_idx, 1);
                 bloom_filter.write((bit<32>)bf1_idx, 1);
@@ -350,17 +350,15 @@ control MyEgress(inout headers hdr,
     chunk2_size_t tmp_payload_value_2;
  
     #define REGISTER(i)                                                                                                                                       \
-    register<bit<32>> (ENTRY_SIZE) payload_value_store_1_##i;                                                                                                   \
-    register<bit<32>> (ENTRY_SIZE) payload_value_store_2_##i;                                                                                                   \
-    register<bit<8>> (ENTRY_SIZE) payload_value_store_3_##i;                                                                                                    \
-    register<bit<8>> (ENTRY_SIZE) payload_value_store_4_##i;                                                                                                    \
+    register<chunk1_size_t> (ENTRY_SIZE) payload_value_store_1_##i;                                                                                                   \
+    register<chunk2_size_t> (ENTRY_SIZE) payload_value_store_2_##i;                                                                                                   \
+    register<chunk1_size_t> (ENTRY_SIZE) payload_value_store_3_##i;                                                                                                    \
+    register<chunk2_size_t> (ENTRY_SIZE) payload_value_store_4_##i;                                                                                                    \
     action indexing_action_##i() {                                                                                                                               \
         hdr.index[##i##].setValid();                                                                                                                         \
         hash(hdr.index[##i##].index, HashAlgorithm.crc16, meta.custom_metadata.hash_base, {hdr.u_chunk_token[##i##].chunk}, meta.custom_metadata.hash_max); \
-        payload_value_store_1_##i##.read(tmp_payload_value_1, (bit<32>)hdr.index[##i##].index); \
-        meta.custom_metadata.value_diff1 = hdr.u_chunk_token[##i##].chunk.chunk_payload_1 - tmp_payload_value_1; \
-        payload_value_store_3_##i##.read(tmp_payload_value_2, (bit<32>)hdr.index[##i##].index); \
-        meta.custom_metadata.value_diff2 = hdr.u_chunk_token[##i##].chunk.chunk_payload_3 - tmp_payload_value_2; \
+        payload_value_store_3_##i##.read(tmp_payload_value_1, (bit<32>)hdr.index[##i##].index); \
+        meta.custom_metadata.value_diff1 = hdr.u_chunk_token[##i##].chunk.chunk_payload_3 - tmp_payload_value_1; \
     }      
 
     // Define REGISTER & ACTION per chunk[##i##]
@@ -381,7 +379,8 @@ control MyEgress(inout headers hdr,
         meta.custom_metadata.meta_bitmap = 0;
         hdr.tre_shim.setValid();
         hdr.tre_shim.dstSwitchID = meta.custom_metadata.pair_dst_ID;
-        hdr.tre_shim.srcSwitchID = meta.custom_metadata.pair_src_ID;        
+        hdr.tre_shim.srcSwitchID = meta.custom_metadata.pair_src_ID; 
+        meta.custom_metadata.value_diff2 = 0;       
     }
 
     action tokenization(bit<11> K) {
@@ -432,6 +431,7 @@ control MyEgress(inout headers hdr,
     }
 
     apply {
+        
         table_initiate_tre.apply();
         table_tre_control.apply();
                

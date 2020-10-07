@@ -7,3 +7,5 @@ finefoods*.txt
 results/
 logs/
 *_dist_*
+*.json
+build/
