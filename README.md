@@ -11,12 +11,12 @@ We implement NETRE prototype in P4 language for BMv2 simple_switch target and To
 
 1. Download dataset
 
-	wget http://snap.stanford.edu/data/finefoods.txt.gz
-	gzip -d finefoods.txt.gz
+    wget http://snap.stanford.edu/data/finefoods.txt.gz
+    gzip -d finefoods.txt.gz
 
 2. Create files for test and compile codes
 
-	./setup.sh
+    ./setup.sh
 
 
 
