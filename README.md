@@ -32,6 +32,10 @@ To run test, simply do:
 
 This script generates packets according to a  Zipf distribution with different skewed parameters(0.4 - 0.8) and calculates reduction ratio.
 
+You can see the test results through this command line.
+
+    python show_result.py
+
 
 ### Clean up the test
 
