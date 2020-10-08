@@ -22,9 +22,7 @@ fname = ''
 def handle_pkt(pkt):
     global pktsum, pktcnt
     with open("build/results/reduction/recvsum_" + fname, "w") as f:
-        f.write("pktcnt = " + str(pktcnt) + "\n")
-        f.write("pktsum = " + str(pktsum) + "\n")
-        f.write("end time = " + str(time.time()) + "\n")
+        f.write(str(pktsum) + "\n")
 
     # hexdump(pkt)
     pktsum += len(pkt)

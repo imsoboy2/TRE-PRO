@@ -83,8 +83,7 @@ def main():
   f1.close()
   
   with open("build/results/reduction/sentsum_" + a.fname, "w") as f:
-    f.write("pktcnt = " + str(ipcnt) + "\n")
-    f.write("pktsum = " + str(pktsum) + "\n")
+    f.write(str(pktsum) + "\n")
 
 if __name__ == '__main__':
   main()
