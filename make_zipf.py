@@ -11,7 +11,7 @@ a = parser.parse_args()
 
 num_query = a.pktnum
 path_query = "z" + str(a.dist) + "_dist_" + str(num_query / 10)
-zipf = a.dist / 100
+zipf = a.dist / 100.0
 
 max_key = 4999
 
@@ -33,6 +33,3 @@ with open("build/" + path_query, 'w') as f:
     a = random.choice(field)
     num = "%04X" % a
     f.write(num + '\n')
-    # classC = int(num[0:2], 16)
-    # classD = int(num[2:4], 16)
-    # f.write('10.10.%d.%d\n' % (classC, classD))
