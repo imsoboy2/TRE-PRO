@@ -79,8 +79,8 @@ header tre_shim_t {
 
 header chunk_t {
     chunk1_size_t chunk_payload_1;
-    chunk1_size_t chunk_payload_2;
-    chunk2_size_t chunk_payload_3;
+    chunk2_size_t chunk_payload_2;
+    chunk1_size_t chunk_payload_3;
     chunk2_size_t chunk_payload_4;
 }
 
@@ -287,7 +287,7 @@ control MyIngress(inout headers hdr,
             drop;
         }
         size = 2048;
-        default_action = set_egress;
+        default_action = set_egress();
     }
     apply {
         if (hdr.ipv4.isValid() && hdr.ipv4.ttl > 0) {
@@ -316,8 +316,8 @@ control MyEgress(inout headers hdr,
     
     #define REGISTER(i) \
         register<chunk1_size_t> (ENTRY_SIZE) payload_value_store_1_##i; \
-        register<chunk1_size_t> (ENTRY_SIZE) payload_value_store_2_##i; \
-        register<chunk2_size_t> (ENTRY_SIZE) payload_value_store_3_##i; \
+        register<chunk2_size_t> (ENTRY_SIZE) payload_value_store_2_##i; \
+        register<chunk1_size_t> (ENTRY_SIZE) payload_value_store_3_##i; \
         register<chunk2_size_t> (ENTRY_SIZE) payload_value_store_4_##i; \
 
     REGISTER(0)
