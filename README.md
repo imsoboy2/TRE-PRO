@@ -4,7 +4,7 @@ TRE-PRO: a new in-network TRE architecture that leverages the power and flexibil
 
 We implement TRE-PRO prototype in P4 language for BMv2 simple_switch target and Tofino TNA target.
 
-
+NOTE: Due to the privacy issue for sharing real network traffic traces provided by UPC's Broadband Communication Research Group, in the next test scenario, we provide generated dataset (Src/Dst request distiribution: zipf dist., Payload data: Amazon food review data).
 # How to run?
 
 ## Testbed setup
