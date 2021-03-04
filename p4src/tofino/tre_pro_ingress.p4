@@ -1,3 +1,6 @@
+// This is simplified version of TRE-PRO implementation for Tofino ASICs
+// All the functional implementations are provided in simple_switch target P4 code
+
 #include <core.p4>
 #if __TARGET_TOFINO__ == 2
 #include <t2na.p4>
