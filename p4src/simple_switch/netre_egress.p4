@@ -23,7 +23,7 @@ NETRE EGRESS - SIMPLE_SWITCH (V1MODEL) TARGET VERSION
 #define ENTRY_SIZE 65536 //2^16
 
 typedef bit<32> chunk1_size_t;
-typedef bit<8> chunk2_size_t;
+typedef bit<32> chunk2_size_t;
 
 const bit<16> SWITCH_IP = 1;
 
@@ -79,8 +79,8 @@ header tre_shim_t {
 
 header chunk_t {
     chunk1_size_t chunk_payload_1;
-    chunk2_size_t chunk_payload_2;
-    chunk1_size_t chunk_payload_3;
+    chunk1_size_t chunk_payload_2;
+    chunk2_size_t chunk_payload_3;
     chunk2_size_t chunk_payload_4;
 }
 
@@ -316,8 +316,8 @@ control MyEgress(inout headers hdr,
     
     #define REGISTER(i) \
         register<chunk1_size_t> (ENTRY_SIZE) payload_value_store_1_##i; \
-        register<chunk2_size_t> (ENTRY_SIZE) payload_value_store_2_##i; \
-        register<chunk1_size_t> (ENTRY_SIZE) payload_value_store_3_##i; \
+        register<chunk1_size_t> (ENTRY_SIZE) payload_value_store_2_##i; \
+        register<chunk2_size_t> (ENTRY_SIZE) payload_value_store_3_##i; \
         register<chunk2_size_t> (ENTRY_SIZE) payload_value_store_4_##i; \
 
     REGISTER(0)
