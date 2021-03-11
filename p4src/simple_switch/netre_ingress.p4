@@ -135,7 +135,9 @@ struct custom_metadata_t {
     bit<16> pair_src_ID;
     bit<16> pair_dst_ID;
     chunk1_size_t value_diff1;
-    chunk2_size_t value_diff2;
+    chunk1_size_t value_diff2;
+    chunk2_size_t value_diff3;
+    chunk2_size_t value_diff4;
     diff_t diff;
 }
 
