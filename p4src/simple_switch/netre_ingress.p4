@@ -33,7 +33,7 @@ NETRE INGRESS - SIMPLE_SWITCH (V1MODEL) TARGET VERSION
 
 typedef bit<32> chunk1_size_t;
 typedef bit<32> chunk2_size_t;
-typedef bit<48> diff_t;
+typedef bit<32> diff_t;
 
 /*************************************************************************
 ******************* H E A D E R S & M E T A D A T A **********************
@@ -365,12 +365,15 @@ control MyEgress(inout headers hdr,
     action indexing_action_##i() {                                                                                                                               \
         hdr.index[##i##].setValid();                                                                                                                         \
         hash(hdr.index[##i##].index, HashAlgorithm.crc16, meta.custom_metadata.hash_base, {hdr.u_chunk_token[##i##].chunk}, meta.custom_metadata.hash_max); \
-        payload_value_store_3_##i##.read(tmp_payload_value_1, (bit<32>)hdr.index[##i##].index); \
+        payload_value_store_1_##i##.read(tmp_payload_value_1, (bit<32>)hdr.index[##i##].index); \
+        payload_value_store_2_##i##.read(tmp_payload_value_2, (bit<32>)hdr.index[##i##].index); \
+        payload_value_store_3_##i##.read(tmp_payload_value_3, (bit<32>)hdr.index[##i##].index); \
+        payload_value_store_4_##i##.read(tmp_payload_value_4, (bit<32>)hdr.index[##i##].index); \
         meta.custom_metadata.value_diff1 = hdr.u_chunk_token[##i##].chunk.chunk_payload_1 - tmp_payload_value_1; \
         meta.custom_metadata.value_diff2 = hdr.u_chunk_token[##i##].chunk.chunk_payload_2 - tmp_payload_value_2; \
         meta.custom_metadata.value_diff3 = hdr.u_chunk_token[##i##].chunk.chunk_payload_3 - tmp_payload_value_3; \
         meta.custom_metadata.value_diff4 = hdr.u_chunk_token[##i##].chunk.chunk_payload_4 - tmp_payload_value_4; \
-        meta.custom_metadata.diff = meta.custom_metadata.value_diff1 + meta.custom_metadata.value_diff2 + meta.custom_metadata.value_diff3 + meta.custom_metadata.value_diff4;\        
+        meta.custom_metadata.diff = meta.custom_metadata.value_diff1 + meta.custom_metadata.value_diff2 + meta.custom_metadata.value_diff3 + meta.custom_metadata.value_diff4;  \
     }      
 
     // Define REGISTER & ACTION per chunk[##i##]
@@ -392,7 +395,7 @@ control MyEgress(inout headers hdr,
         hdr.tre_shim.setValid();
         hdr.tre_shim.dstSwitchID = meta.custom_metadata.pair_dst_ID;
         hdr.tre_shim.srcSwitchID = meta.custom_metadata.pair_src_ID; 
-        meta.custom_metadata.value_diff2 = 0;       
+        meta.custom_metadata.diff = 0;   
     }
 
     action tokenization(bit<11> K) {
