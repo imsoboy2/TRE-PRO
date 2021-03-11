@@ -32,7 +32,8 @@ NETRE INGRESS - SIMPLE_SWITCH (V1MODEL) TARGET VERSION
 #define ENTRY_SIZE 65536
 
 typedef bit<32> chunk1_size_t;
-typedef bit<8> chunk2_size_t;
+typedef bit<32> chunk2_size_t;
+typedef bit<48> diff_t;
 
 /*************************************************************************
 ******************* H E A D E R S & M E T A D A T A **********************
@@ -90,8 +91,8 @@ header tre_shim_t {
 
 header chunk_t {
     chunk1_size_t chunk_payload_1;
-    chunk2_size_t chunk_payload_2;
-    chunk1_size_t chunk_payload_3;
+    chunk1_size_t chunk_payload_2;
+    chunk2_size_t chunk_payload_3;
     chunk2_size_t chunk_payload_4;
 }
 
@@ -135,6 +136,7 @@ struct custom_metadata_t {
     bit<16> pair_dst_ID;
     chunk1_size_t value_diff1;
     chunk2_size_t value_diff2;
+    diff_t diff;
 }
 
 struct metadata {
@@ -347,7 +349,11 @@ control MyEgress(inout headers hdr,
     //IMPLEMENTATION: FIXED Chunking / Fingerprinting and FIXED MATCHING
  
     chunk1_size_t tmp_payload_value_1;
-    chunk2_size_t tmp_payload_value_2;
+    chunk1_size_t tmp_payload_value_2;
+    chunk2_size_t tmp_payload_value_3;
+    chunk2_size_t tmp_payload_value_4;
+    diff_t tmp_diff;
+    
  
     #define REGISTER(i)                                                                                                                                       \
     register<chunk1_size_t> (ENTRY_SIZE) payload_value_store_1_##i;                                                                                                   \
@@ -358,7 +364,11 @@ control MyEgress(inout headers hdr,
         hdr.index[##i##].setValid();                                                                                                                         \
         hash(hdr.index[##i##].index, HashAlgorithm.crc16, meta.custom_metadata.hash_base, {hdr.u_chunk_token[##i##].chunk}, meta.custom_metadata.hash_max); \
         payload_value_store_3_##i##.read(tmp_payload_value_1, (bit<32>)hdr.index[##i##].index); \
-        meta.custom_metadata.value_diff1 = hdr.u_chunk_token[##i##].chunk.chunk_payload_3 - tmp_payload_value_1; \
+        meta.custom_metadata.value_diff1 = hdr.u_chunk_token[##i##].chunk.chunk_payload_1 - tmp_payload_value_1; \
+        meta.custom_metadata.value_diff2 = hdr.u_chunk_token[##i##].chunk.chunk_payload_2 - tmp_payload_value_2; \
+        meta.custom_metadata.value_diff3 = hdr.u_chunk_token[##i##].chunk.chunk_payload_3 - tmp_payload_value_3; \
+        meta.custom_metadata.value_diff4 = hdr.u_chunk_token[##i##].chunk.chunk_payload_4 - tmp_payload_value_4; \
+        meta.custom_metadata.diff = meta.custom_metadata.value_diff1 + meta.custom_metadata.value_diff2 + meta.custom_metadata.value_diff3 + meta.custom_metadata.value_diff4;\        
     }      
 
     // Define REGISTER & ACTION per chunk[##i##]
@@ -442,7 +452,7 @@ control MyEgress(inout headers hdr,
            
             indexing_action_0();
             if (hdr.u_chunk_token[0].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(0);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_0.write((bit<32>)hdr.index[0].index, hdr.u_chunk_token[0].chunk.chunk_payload_1); // overwrite
@@ -455,7 +465,7 @@ control MyEgress(inout headers hdr,
             
             indexing_action_1();
             if (hdr.u_chunk_token[1].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(1);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_1.write((bit<32>)hdr.index[1].index, hdr.u_chunk_token[1].chunk.chunk_payload_1); // overwrite
@@ -468,7 +478,7 @@ control MyEgress(inout headers hdr,
 
             indexing_action_2();
             if (hdr.u_chunk_token[2].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(2);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_2.write((bit<32>)hdr.index[2].index, hdr.u_chunk_token[2].chunk.chunk_payload_1); // overwrite
@@ -481,7 +491,7 @@ control MyEgress(inout headers hdr,
 
             indexing_action_3();
             if (hdr.u_chunk_token[3].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(3);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_3.write((bit<32>)hdr.index[3].index, hdr.u_chunk_token[3].chunk.chunk_payload_1); // overwrite
@@ -494,7 +504,7 @@ control MyEgress(inout headers hdr,
 
             indexing_action_4();
             if (hdr.u_chunk_token[4].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(4);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_4.write((bit<32>)hdr.index[4].index, hdr.u_chunk_token[4].chunk.chunk_payload_1); // overwrite
@@ -507,7 +517,7 @@ control MyEgress(inout headers hdr,
 
             indexing_action_5();
             if (hdr.u_chunk_token[5].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(5);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_5.write((bit<32>)hdr.index[5].index, hdr.u_chunk_token[5].chunk.chunk_payload_1); // overwrite
@@ -520,7 +530,7 @@ control MyEgress(inout headers hdr,
 
             indexing_action_6();
             if (hdr.u_chunk_token[6].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(6);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_6.write((bit<32>)hdr.index[6].index, hdr.u_chunk_token[6].chunk.chunk_payload_1); // overwrite
@@ -533,7 +543,7 @@ control MyEgress(inout headers hdr,
 
             indexing_action_7();
             if (hdr.u_chunk_token[7].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(7);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_7.write((bit<32>)hdr.index[7].index, hdr.u_chunk_token[7].chunk.chunk_payload_1); // overwrite
@@ -546,7 +556,7 @@ control MyEgress(inout headers hdr,
 
             indexing_action_8();
             if (hdr.u_chunk_token[8].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(8);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_8.write((bit<32>)hdr.index[8].index, hdr.u_chunk_token[8].chunk.chunk_payload_1); // overwrite
@@ -559,7 +569,7 @@ control MyEgress(inout headers hdr,
 
             indexing_action_9();
             if (hdr.u_chunk_token[9].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(9);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_9.write((bit<32>)hdr.index[9].index, hdr.u_chunk_token[9].chunk.chunk_payload_1); // overwrite
@@ -572,7 +582,7 @@ control MyEgress(inout headers hdr,
 
             indexing_action_10();
             if (hdr.u_chunk_token[10].chunk.isValid()) {
-                if(meta.custom_metadata.value_diff1 == 0 && meta.custom_metadata.value_diff2 == 0) { // cache hit
+                if(meta.custom_metadata.diff == 0) { // cache hit
                     tokenization(10);
                 } else { // register is empty or hash collision, overwrite the value
                     payload_value_store_1_10.write((bit<32>)hdr.index[10].index, hdr.u_chunk_token[10].chunk.chunk_payload_1); // overwrite
